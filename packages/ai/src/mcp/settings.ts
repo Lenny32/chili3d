@@ -201,11 +201,18 @@ export function splitCommand(command: string): string[] {
 export function shellArg(value: string, windows = isWindowsClient()): string {
     if (/^[\w@%+=:,./\\-]+$/.test(value)) return value;
     if (!windows) return `'${value.replaceAll("'", `'"'"'`)}'`;
-    const escaped = value.replace(
-        /(\\*)("|$)/g,
-        (_, slashes: string, quote: string) => slashes + slashes + quote + quote,
-    );
-    return `"${escaped}"`;
+    let escaped = "";
+    let slashes = 0;
+    for (const char of value) {
+        if (char === "\\") {
+            slashes++;
+            continue;
+        }
+        const run = "\\".repeat(char === '"' ? slashes * 2 : slashes);
+        escaped += run + (char === '"' ? '""' : char);
+        slashes = 0;
+    }
+    return `"${escaped}${"\\".repeat(slashes * 2)}"`;
 }
 
 export function resolveBridgeCommand(

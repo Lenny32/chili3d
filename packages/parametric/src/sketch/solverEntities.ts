@@ -95,7 +95,7 @@ export function tangentKindFor(
 }
 
 /**
- * The tangent constraint relating two entities, refs in the garlic params layout
+ * The tangent constraint relating two entities, refs in the solver params layout
  * (line endpoints first, then a circle's center, then an arc's center and start).
  * Argument order is irrelevant; `undefined` for a pair that cannot be tangent:
  * two lines.

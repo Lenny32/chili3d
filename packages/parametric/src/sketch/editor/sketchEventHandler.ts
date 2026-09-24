@@ -22,6 +22,7 @@ import {
 import {
     arcAngles,
     ConstraintKind,
+    ellipsePoint,
     entityPointCount,
     isDatumEntityId,
     isExternalEntityId,
@@ -763,11 +764,26 @@ export function sketchEntityMesh(
     entity: SketchEntityData,
     color: number = VisualConfig.highlightEdgeColor,
     lineType: "solid" | "dash" = "solid",
-): EdgeMeshData {
+): ShapeMeshData {
     const plane = editor.node.plane;
     const [x1, y1, x2, y2] = entity.params;
+    if (entity.type === "point") {
+        return MeshDataUtils.createVertexMesh(toWorld(plane, x1, y1), VisualConfig.editVertexSize, color);
+    }
+    if (entity.construction) lineType = "dash";
     let mesh: EdgeMeshData;
-    if (entity.type === "line") {
+    if (entity.type === "ellipse") {
+        const position = new Float32Array(CIRCLE_SEGMENTS * 6);
+        for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
+            const a = toWorld(plane, ...ellipsePoint(entity.params, (i * Math.PI * 2) / CIRCLE_SEGMENTS));
+            const b = toWorld(
+                plane,
+                ...ellipsePoint(entity.params, ((i + 1) * Math.PI * 2) / CIRCLE_SEGMENTS),
+            );
+            position.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6);
+        }
+        mesh = { position, range: [], color, lineType };
+    } else if (entity.type === "line") {
         mesh = MeshDataUtils.createEdgeMesh(toWorld(plane, x1, y1), toWorld(plane, x2, y2), color, lineType);
     } else if (entity.type === "arc") {
         const [cx, cy, r, a0, sweep] = arcGeometry(entity.params);
@@ -837,6 +853,16 @@ function arcSegmentMesh(
 /** uv distance to an entity's curve: segment, arc sweep, or circle circumference. */
 function entityDistance(uv: [number, number], entity: SketchEntityData): number {
     const [x1, y1, x2, y2] = entity.params;
+    if (entity.type === "point") return Math.hypot(uv[0] - x1, uv[1] - y1);
+    if (entity.type === "ellipse") {
+        let distance = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
+            const a = ellipsePoint(entity.params, (i * Math.PI * 2) / CIRCLE_SEGMENTS);
+            const b = ellipsePoint(entity.params, ((i + 1) * Math.PI * 2) / CIRCLE_SEGMENTS);
+            distance = Math.min(distance, pointToSegmentDistance(...uv, ...a, ...b));
+        }
+        return distance;
+    }
     if (entity.type === "line") return pointToSegmentDistance(uv[0], uv[1], x1, y1, x2, y2);
     if (entity.type === "arc") return pointToArcDistance(uv[0], uv[1], entity.params);
     return Math.abs(Math.hypot(uv[0] - x1, uv[1] - y1) - entity.params[2]);

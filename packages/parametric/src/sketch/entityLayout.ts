@@ -19,6 +19,8 @@ export const PARAM_KIND_LENGTH = 1;
 
 /** solver param kinds per entity type: line = 2 points, circle = center + radius, arc = 3 points. */
 export const ENTITY_PARAM_KINDS: Record<SketchEntityType, number[]> = {
+    point: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE],
+    ellipse: Array(6).fill(PARAM_KIND_COORDINATE),
     line: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE],
     circle: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_LENGTH],
     arc: [

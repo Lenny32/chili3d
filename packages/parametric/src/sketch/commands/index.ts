@@ -3,6 +3,9 @@
 
 import "./sketchArc";
 import "./sketchCircle";
+import "./sketchEllipse";
+import "./sketchPoint";
+import "./sketchPolygon";
 import "./sketchCommands";
 import "./sketchConstraints";
 import "./sketchDimensions";

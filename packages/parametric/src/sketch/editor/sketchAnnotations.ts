@@ -340,7 +340,9 @@ export class SketchAnnotationManager implements IDisposable {
         // an arc's structural PointOnArc (all refs on the arc itself) stays invisible —
         // it is part of the entity, deleting it would break the arc geometry
         if (
-            constraint.kind === ConstraintKind.PointOnArc &&
+            (constraint.kind === ConstraintKind.PointOnArc ||
+                (constraint.kind === ConstraintKind.Perpendicular &&
+                    this.solver.entity(constraint.refs[0].entityId)?.type === "ellipse")) &&
             constraint.refs.every((r) => r.entityId === constraint.refs[0].entityId)
         ) {
             return;
@@ -398,6 +400,9 @@ export class SketchAnnotationManager implements IDisposable {
         const entity = this.solver.entity(entityId);
         if (entity === undefined) return undefined;
         const off = BADGE_OFFSET_PX * px;
+        if (entity.type === "point" || entity.type === "ellipse") {
+            return pointBadgeAnchor([entity.params[0], entity.params[1]], px);
+        }
         if (entity.type === "line") {
             const p1: [number, number] = [entity.params[0], entity.params[1]];
             const p2: [number, number] = [entity.params[2], entity.params[3]];

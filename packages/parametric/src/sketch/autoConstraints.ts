@@ -127,7 +127,7 @@ export interface DragSnapResult {
     tangentKind?: ConstraintKind;
 }
 
-/** The constraint a snapped point would add, refs in garlic's layout. */
+/** The constraint a snapped point would add, refs in the solver layout. */
 export function snapConstraint(ref: SketchPointRef, snap: DragSnap): Omit<SketchConstraintData, "id"> {
     const kind = snapConstraintKind(snap);
     switch (snap.kind) {
@@ -655,7 +655,7 @@ function alignToAxis(
  * (near-)tangent to. The entity is read back from the solver, so the gaps are
  * measured on whatever geometry the snaps in `applyAutoConstraints` left behind.
  * That geometry is left where it is: the gap is within the tolerance by
- * construction, so the solve only closes a sub-tolerance distance, and garlic
+ * construction, so the solve only closes a sub-tolerance distance, and the solver
  * reads the tangency branch (which side; internal or external) off the geometry as
  * it stands. One tangent constraint is enough for a tangent pair: the contact
  * point of a smooth curve is not a ref the sketch can address, and where it does

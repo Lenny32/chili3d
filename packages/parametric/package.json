@@ -6,5 +6,8 @@
     "type": "module",
     "devDependencies": {
         "@chili3d/core": "*"
+    },
+    "dependencies": {
+        "@salusoft89/planegcs": "1.2.0"
     }
 }

@@ -3,7 +3,7 @@
 
 import { Plane } from "@chili3d/core";
 import { rs } from "@rstest/core";
-import { WasmSystem } from "../../lib/garlic";
+import { SolverSystem } from "../../src/sketch/planegcs";
 import {
     axisLineRefs,
     ConstraintKind,
@@ -95,7 +95,7 @@ describe("fixed entities (datum and externals)", () => {
     });
 
     test("external and datum reads never cross the wasm boundary after seeding", () => {
-        const getParams = rs.spyOn(WasmSystem.prototype, "get_params");
+        const getParams = rs.spyOn(SolverSystem.prototype, "get_params");
         const solver = new SketchSolver(Plane.XY, dataWith(EXT_LINE, EXT_CIRCLE));
         try {
             // seeding legitimately crossed the boundary; reads from here on must not
@@ -162,7 +162,7 @@ describe("fixed entities (datum and externals)", () => {
 
     test("the entity cache mirrors external moves made through updateExternalEntity", () => {
         const solver = new SketchSolver(Plane.XY, dataWith(EXT_LINE));
-        const getParams = rs.spyOn(WasmSystem.prototype, "get_params");
+        const getParams = rs.spyOn(SolverSystem.prototype, "get_params");
         try {
             solver.updateExternalEntity(EXT_LINE.entityId, [0, 7, 10, 7]);
             getParams.mockClear();

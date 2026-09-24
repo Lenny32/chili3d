@@ -15,6 +15,9 @@ export default defineConfig({
     experiments: {
         css: true,
     },
+    // The CLI turns lazy compilation on for dev by default; its empty trigger responses
+    // log "XML Parsing Error: no root element found" in Firefox.
+    lazyCompilation: false,
     module: {
         parser: {
             "css/auto": {
@@ -29,6 +32,14 @@ export default defineConfig({
             {
                 test: /\.wasm$/,
                 type: "asset",
+            },
+            {
+                // The PlaneGCS emscripten glue resolves its own files at runtime
+                // (`new URL("./", import.meta.url)`); keep rspack from bundling that.
+                // Its node-only branch imports node builtins the browser never reaches.
+                test: /planegcs[\\/]dist[\\/]planegcs_dist[\\/]planegcs\.js$/,
+                parser: { url: false },
+                resolve: { fallback: { module: false, fs: false, path: false, url: false } },
             },
             {
                 test: /\.cur$/,

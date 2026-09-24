@@ -81,7 +81,7 @@ describe("SketchSolver expression datums", () => {
     test("the expression is persisted verbatim, not its current value", () => {
         const { solver, id } = dimensionedLine(scopeOf({ w: length(20) }), "w / 2");
         solver.solve(true);
-        // A literal is read back from garlic (that is where normalization lands); an
+        // A literal is read back from the solver (that is where normalization lands); an
         // expression must survive the round trip or every commit would erase it.
         const constraint = solver.toData().constraints.find((x) => x.id === id);
         expect(constraint?.datum).toBe("w / 2");

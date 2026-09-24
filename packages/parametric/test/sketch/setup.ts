@@ -2,8 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import { readFileSync } from "node:fs";
-import path from "node:path";
-import { initGarlicSync } from "../../src/sketch/garlic";
+import { createRequire } from "node:module";
+import { initPlaneGcs } from "../../src/sketch/planegcs";
 
-// Load the garlic constraint-solver WASM synchronously from bytes for node tests.
-initGarlicSync(readFileSync(path.resolve(import.meta.dirname, "..", "..", "lib", "garlic_bg.wasm")));
+// Load the PlaneGCS constraint-solver WASM from bytes for node tests.
+const require = createRequire(import.meta.url);
+await initPlaneGcs(readFileSync(require.resolve("@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm")));

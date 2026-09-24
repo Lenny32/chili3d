@@ -204,7 +204,6 @@ export default {
         "command.sketch.toggleExternal": "Toggle External",
         "command.special.last": "__Last_COMMAND__",
         "command.test.performance": "Performance Test",
-        "command.wechat.group": "Wechat",
         "command.workingPlane.alignToPlane": "Align",
         "command.workingPlane.fromSection": "Section",
         "command.workingPlane.set": "Set",

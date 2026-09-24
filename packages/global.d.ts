@@ -28,6 +28,12 @@ declare module "*.jpg" {
 
 declare module "*.sass";
 
+// The PlaneGCS emscripten glue ships without a declaration file of its own.
+declare module "@salusoft89/planegcs/dist/planegcs_dist/planegcs.js" {
+    const initModule: (options?: object) => Promise<unknown>;
+    export default initModule;
+}
+
 // @rstest/core's JestAssertion interface extends jest.Matchers (normally provided
 // by @types/jest); shim the namespace so tsc --noEmit stays clean without the extra dep
 declare namespace jest {

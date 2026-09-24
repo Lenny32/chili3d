@@ -2,7 +2,6 @@
 // See LICENSE file in the project root for full license information.
 
 import { EMPTY_SCOPE, type ParameterValue, type Plane, Result, type Scope } from "@chili3d/core";
-import type { WasmSystem } from "../../lib/garlic";
 import { INCIDENCE_TOLERANCE } from "../features/refGeometry";
 import { ENTITY_PARAM_KINDS, PARAM_KIND_COORDINATE, PARAM_KIND_LENGTH } from "./entityLayout";
 import {
@@ -11,7 +10,8 @@ import {
     ExternalEntityRegistry,
     type ExternalPins,
 } from "./externalEntities";
-import { newGarlicSystem } from "./garlic";
+import type { SolverSystem } from "./planegcs";
+import { newSolverSystem } from "./planegcs";
 import {
     ConstraintKind,
     datumEntityData,
@@ -60,20 +60,20 @@ export interface SolveOutcome {
     dofs: number;
 }
 
-/** One datum as it goes into garlic: what to persist alongside the value it resolved to. */
+/** One datum as it goes into the solver: what to persist alongside the value it resolved to. */
 interface DatumValue {
     readonly source: ParameterValue;
     readonly value: number;
 }
 
-/** garlic param wiring for one constraint, as `buildConstraintParams` works it out. */
+/** solver param wiring for one constraint, as `buildConstraintParams` works it out. */
 interface ConstraintParams {
     params: number[];
     /** The params a datum was written into, when the kind carries one. */
     datumParamIds?: number[];
     datumSources?: ParameterValue[];
-    /** garlic kind when it differs from the sketch-level kind (arc radius → P2PDistance). */
-    garlicKind?: ConstraintKind;
+    /** Solver kind when it differs from the sketch-level kind (arc radius → P2PDistance). */
+    solverKind?: ConstraintKind;
 }
 
 /** The kinds whose value arrives through a datum param rather than from the geometry. */
@@ -91,36 +91,36 @@ interface ConstraintRecord {
     id: number;
     kind: ConstraintKind;
     refs: SketchPointRef[];
-    garlicId: number;
+    solverId: number;
     datumParamIds?: number[];
     /**
      * What each `datumParamIds` entry was written from, in the same order: a number
-     * may be read back from garlic (that is how the solver normalizes a literal),
-     * a string is an expression and must be persisted verbatim — reading garlic back
+     * may be read back from the solver (that is how the solver normalizes a literal),
+     * a string is an expression and must be persisted verbatim — reading the solver back
      * over it would replace the user's expression with its current value.
      */
     datumSources?: ParameterValue[];
 }
 
 /**
- * Wraps one garlic `WasmSystem` for a sketch on a given plane.
+ * Wraps one PlaneGCS-backed `SolverSystem` for a sketch on a given plane.
  * Entity/constraint ids exposed here are stable and owned by this class;
- * garlic ParamId/ConstraintId handles stay internal.
+ * the solver ParamId/ConstraintId handles stay internal.
  */
 export class SketchSolver implements ExternalEntityHost {
     readonly plane: Plane;
     /**
-     * The garlic system every param and constraint is created in. Public because the
+     * The solver system every param and constraint is created in. Public because the
      * external-entity registry (`externalEntities.ts`) is a peer collaborator that
      * places params in it — see `ExternalEntityHost`. Replaced wholesale by `reset`.
      */
-    system: WasmSystem;
+    system: SolverSystem;
     /** Entity tables holding real AND external entities (externals under reserved negative ids). */
     private readonly entityTypes = new Map<number, SketchEntityType>();
     private readonly entityParams = new Map<number, number[]>();
     private readonly entityCache = new Map<number, number[]>();
     private readonly constraints = new Map<number, ConstraintRecord>();
-    /** garlic param ids of the datum entities (origin, X/Y axes), keyed by reserved id. */
+    /** solver param ids of the datum entities (origin, X/Y axes), keyed by reserved id. */
     private readonly datumParams = new Map<number, number[]>();
     /** Internal constraints pinning the datum (never serialized, shown or removable). */
     private structuralConstraintIds: number[] = [];
@@ -160,7 +160,7 @@ export class SketchSolver implements ExternalEntityHost {
     constructor(plane: Plane, data?: SketchData, scope: Scope = EMPTY_SCOPE) {
         this.plane = plane;
         this._scope = scope;
-        this.system = newGarlicSystem();
+        this.system = newSolverSystem();
         this.seedDatum();
         if (data !== undefined) {
             this.loadData(data);
@@ -174,7 +174,7 @@ export class SketchSolver implements ExternalEntityHost {
 
     /**
      * Re-resolves every expression datum against `scope` and pushes the new values into
-     * garlic. Returns whether any value actually moved, so the caller can skip a solve
+     * the solver. Returns whether any value actually moved, so the caller can skip a solve
      * that would find nothing to do. A datum that no longer resolves is reported through
      * `datumErrors` and keeps its previous value — the sketch stays usable.
      */
@@ -260,7 +260,7 @@ export class SketchSolver implements ExternalEntityHost {
         // whose constraint was cascaded away untransacted by syncExternalRefs), and
         // a no-op beats throwing from a delete handler.
         if (record === undefined) return;
-        this.system.remove_constraint(record.garlicId);
+        this.system.remove_constraint(record.solverId);
         for (const datumParamId of record.datumParamIds ?? []) {
             this.system.remove_param(datumParamId);
         }
@@ -538,7 +538,7 @@ export class SketchSolver implements ExternalEntityHost {
 
     /**
      * All point refs coincident-linked to `ref` (including `ref` itself).
-     * Coincident constraints merge points conceptually; garlic keeps separate params,
+     * Coincident constraints merge points conceptually; the solver keeps separate params,
      * so drag operations must move the whole group. Fixed (datum and external) refs
      * never join a group — fixed entities must not be dragged.
      */
@@ -600,7 +600,7 @@ export class SketchSolver implements ExternalEntityHost {
         const group = this.coincidentGroup(ref).filter((r) => !this.fixedEntities.has(r.entityId));
         const groupKeys = new Set(group.map(pointRefKey));
         // A point pinned onto a line slides along it instead of following the raw
-        // cursor: garlic's coarse solve does not converge from far off-manifold
+        // cursor: the coarse solve does not converge from far off-manifold
         // positions, which would leave the point drifting off its constraint and
         // eventually surface as a bogus "Conflicting" report.
         const [pu, pv] = this.projectOntoIncidence(groupKeys, u, v);
@@ -666,9 +666,9 @@ export class SketchSolver implements ExternalEntityHost {
 
     /**
      * The datums of a record as they should be persisted, in order. A literal is read
-     * back from garlic — that is where the solver's normalization lands (the angle sign
+     * back from the solver — that is where the solver's normalization lands (the angle sign
      * `syncAngleDatumSide` settles on, the geometric fallback a datumless constraint
-     * started from). An expression is returned as written: reading garlic back over it
+     * started from). An expression is returned as written: reading the solver back over it
      * would replace the user's expression with whatever it currently evaluates to, once
      * per commit.
      */
@@ -689,7 +689,7 @@ export class SketchSolver implements ExternalEntityHost {
     /** Replaces all state with `data` — undo/redo rewrites the node data behind the solver. */
     reset(data: SketchData): void {
         this.system.free();
-        this.system = newGarlicSystem();
+        this.system = newSolverSystem();
         this.entityTypes.clear();
         this.entityParams.clear();
         this.entityCache.clear();
@@ -706,7 +706,7 @@ export class SketchSolver implements ExternalEntityHost {
 
     /**
      * Creates the datum entities (origin at (0,0), X axis (0,0)-(1,0), Y axis
-     * (0,0)-(0,1)) as garlic params under reserved negative ids, each point pinned
+     * (0,0)-(0,1)) as solver params under reserved negative ids, each point pinned
      * by an internal Fix constraint and marked fixed. Net dofs contribution is
      * zero; the structural constraints stay out of `this.constraints`, so they are
      * never serialized, annotated or removable.
@@ -731,7 +731,7 @@ export class SketchSolver implements ExternalEntityHost {
 
     // The registry in `externalEntities.ts` owns which externals exist and where they
     // came from; these are the two halves of the seam. First the `ExternalEntityHost`
-    // operations it borrows — the entity tables and the garlic system, expressed as
+    // operations it borrows — the entity tables and the solver system, expressed as
     // named operations rather than handed over as fields. Then one-line delegations,
     // which are the reason nothing outside this class had to change.
 
@@ -752,7 +752,7 @@ export class SketchSolver implements ExternalEntityHost {
             : { type, params, cache };
     }
 
-    /** `ExternalEntityHost`: drops the entity's rows; its garlic params are the caller's. */
+    /** `ExternalEntityHost`: drops the entity's rows; its solver params are the caller's. */
     forgetEntity(id: number): void {
         this.entityTypes.delete(id);
         this.entityParams.delete(id);
@@ -872,12 +872,12 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     private addConstraintWithId(id: number, constraint: Omit<SketchConstraintData, "id">): void {
-        const { params, datumParamIds, datumSources, garlicKind } = this.buildConstraintParams(
+        const { params, datumParamIds, datumSources, solverKind } = this.buildConstraintParams(
             constraint,
             id,
         );
-        const garlicId = this.system.add_constraint(
-            garlicKind ?? constraint.kind,
+        const solverId = this.system.add_constraint(
+            solverKind ?? constraint.kind,
             new Uint32Array(params),
             null,
             true,
@@ -887,13 +887,13 @@ export class SketchSolver implements ExternalEntityHost {
             id,
             kind: constraint.kind,
             refs: constraint.refs.map((r) => ({ ...r })),
-            garlicId,
+            solverId,
             datumParamIds,
             datumSources,
         });
     }
 
-    /** garlic param ids for a constraint; datum kinds also create their datum params. */
+    /** solver param ids for a constraint; datum kinds also create their datum params. */
     private buildConstraintParams(
         constraint: Omit<SketchConstraintData, "id">,
         id: number,
@@ -903,8 +903,8 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     /**
-     * The garlic params of a constraint that is pure geometry: every ref contributes the
-     * point / line / arc / radius ids garlic reads for that kind, in ref order.
+     * The solver params of a constraint that is pure geometry: every ref contributes the
+     * point / line / arc / radius ids the solver reads for that kind, in ref order.
      */
     private geometricConstraintParams(constraint: Omit<SketchConstraintData, "id">): number[] {
         const { refs } = constraint;
@@ -966,7 +966,7 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     /**
-     * The garlic params of a datum-driven constraint: its geometric params plus the param
+     * The solver params of a datum-driven constraint: its geometric params plus the param
      * its datum is written into. The value comes from the expression scope, the geometry's
      * own value standing in when the datum is absent or does not resolve (see `datumOf`).
      */
@@ -1023,7 +1023,7 @@ export class SketchSolver implements ExternalEntityHost {
         // arcs have no radius param — drive ‖start−center‖ as a point distance
         const start: SketchPointRef = { entityId, pointIndex: 1 };
         return {
-            garlicKind: ConstraintKind.P2PDistance,
+            solverKind: ConstraintKind.P2PDistance,
             ...this.withDatum(this.arcParams(constraint.refs[0], start), id, constraint, () =>
                 this.currentRadius(entityId),
             ),
@@ -1055,7 +1055,7 @@ export class SketchSolver implements ExternalEntityHost {
         return this.withDatums(params, [this.datumOf(id, constraint.kind, constraint.datum, fallback)]);
     }
 
-    /** The garlic params of each ref, concatenated in ref order. */
+    /** The solver params of each ref, concatenated in ref order. */
     private pointParams(...refs: readonly SketchPointRef[]): number[] {
         return refs.flatMap((ref) => this.pointParamIds(ref));
     }
@@ -1195,7 +1195,7 @@ export class SketchSolver implements ExternalEntityHost {
         return params[2];
     }
 
-    /** garlic-signed perpendicular distance (negative of the usual cross-product sign). */
+    /** solver-signed perpendicular distance (negative of the usual cross-product sign). */
     private currentP2LDistance(refs: SketchPointRef[]): number {
         const [px, py] = this.pointOf(refs[0]);
         const [x1, y1] = this.pointOf(refs[1]);

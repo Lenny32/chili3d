@@ -95,7 +95,7 @@ export class AppBuilder {
             // registers sketch/feature commands, the SketchNode/ParametricBodyNode
             // serializers, and exposes the sketch ribbon contributions
             const parametric = await import("@chili3d/parametric");
-            await parametric.initGarlic();
+            await parametric.initPlaneGcs();
             this._ribbonExtras.push(...parametric.SketchRibbonProfiles, ...ParametricRibbonProfiles);
         });
         return this;

@@ -8,7 +8,7 @@ name: Release MCP bridge
 # - Manual run (Actions > Release MCP bridge > Run workflow): builds the branch or tag picked in
 #   "Use workflow from" with a version you type, and either only keeps the files as a downloadable run artifact or also
 #   publishes them as a (pre)release. The Run workflow button only exists for workflows on the
-#   default branch.
+#   default branch, and GitHub registers a new workflow from a push that changes its file.
 
 on:
     push:

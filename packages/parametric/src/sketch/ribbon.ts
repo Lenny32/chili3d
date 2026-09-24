@@ -12,12 +12,12 @@ type RibbonProfileExtra = RibbonTabProfile & { before?: RibbonTabKeys };
  */
 export const SketchRibbonProfiles: RibbonProfileExtra[] = [
     {
-        tabName: "ribbon.tab.parametric",
-        before: "ribbon.tab.manager",
+        tabName: "ribbon.tab.solid",
         groups: [
             {
-                groupName: "ribbon.group.sketch",
-                items: ["sketch.create", "sketch.enter"],
+                groupName: "ribbon.group.create",
+                items: ["sketch.create"],
+                collapsedItems: ["sketch.enter"],
             },
         ],
     },
@@ -26,37 +26,47 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
         contextual: true,
         groups: [
             {
-                groupName: "ribbon.group.sketch",
-                items: ["sketch.exit"],
-            },
-            {
-                groupName: "ribbon.group.draw",
-                items: ["sketch.line", "sketch.circle", "sketch.arc", "sketch.rectangle"],
+                groupName: "ribbon.group.create",
+                items: [
+                    "sketch.line",
+                    "sketch.rectangle",
+                    "sketch.circle",
+                    "sketch.arc",
+                    "sketch.projectEdges",
+                ],
+                collapsedItems: ["sketch.toggleExternal"],
             },
             {
                 groupName: "ribbon.group.constraint",
+                iconOnly: true,
                 items: [
-                    "constraint.coincident",
-                    ["constraint.fix", "constraint.horizontal", "constraint.vertical"],
+                    ["constraint.coincident", "constraint.fix", "constraint.pointOn"],
+                    ["constraint.horizontal", "constraint.vertical", "constraint.midpoint"],
                     ["constraint.parallel", "constraint.perpendicular", "constraint.equal"],
-                    ["constraint.tangent", "constraint.symmetric", "constraint.midpoint"],
-                    ["constraint.pointOn", "constraint.horizontalAlign", "constraint.verticalAlign"],
+                    ["constraint.tangent", "constraint.symmetric"],
+                    ["constraint.horizontalAlign", "constraint.verticalAlign"],
                 ],
             },
             {
                 groupName: "ribbon.group.dimension",
                 items: [
-                    "dimension.distance",
-                    "dimension.radius",
-                    "dimension.pointLineDistance",
-                    "dimension.angle",
-                    "dimension.horizontalDistance",
-                    "dimension.verticalDistance",
+                    {
+                        type: "split",
+                        items: [
+                            "dimension.distance",
+                            "dimension.horizontalDistance",
+                            "dimension.verticalDistance",
+                            "dimension.pointLineDistance",
+                            "dimension.radius",
+                            "dimension.angle",
+                        ],
+                    },
                 ],
             },
             {
-                groupName: "ribbon.group.other",
-                items: ["sketch.projectEdges", "sketch.toggleExternal"],
+                groupName: "ribbon.group.finish",
+                primary: true,
+                items: ["sketch.exit"],
             },
         ],
     },

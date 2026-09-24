@@ -6,6 +6,7 @@ import { CommandStore, PubSub } from "@chili3d/core";
 import { createMockApplication, createMockDocument } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
 import { CommandService } from "../../src/services/commandService";
+import "../../src/commands/commandSearch";
 
 // ── test command stubs ────────────────────────────────────────────────
 
@@ -206,6 +207,33 @@ describe("CommandService", () => {
             // The registered command really ran, and lastCommand stays the same
             await executed;
             await waitForCommandCompleted(app, "test.box");
+        });
+
+        test("should preserve repeat-last after opening command search", async () => {
+            registerCommand("test.box");
+            service.start();
+            PubSub.default.pub("executeCommand", "test.box" as CommandKeys);
+            await waitForCommandCompleted(app, "test.box");
+
+            const opened = rs.fn(() => {});
+            PubSub.default.sub("openCommandSearch", opened);
+            try {
+                PubSub.default.pub("executeCommand", "edit.commandSearch");
+                await rs.waitFor(() => {
+                    expect(opened).toHaveBeenCalledTimes(1);
+                    expect(app.executingCommand).toBeUndefined();
+                });
+                expect(app.lastCommand).toBe("test.box");
+
+                const executed = TestCommand.nextExecuted();
+                PubSub.default.pub("executeCommand", "special.last");
+                await executed;
+                await rs.waitFor(() => expect(app.executingCommand).toBeUndefined());
+                expect(opened).toHaveBeenCalledTimes(1);
+                expect(app.lastCommand).toBe("test.box");
+            } finally {
+                PubSub.default.remove("openCommandSearch", opened);
+            }
         });
 
         test("should skip execution when commandName is falsy", async () => {

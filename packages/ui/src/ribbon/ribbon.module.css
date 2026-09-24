@@ -196,7 +196,11 @@
 
     .tabHeader {
         color: var(--titlebar-forground-color);
-        padding: 5px 15px;
+        padding: 5px 18px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
 
         &:hover {
             -webkit-text-stroke: 0.65px var(--foreground-color);

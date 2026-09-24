@@ -7,7 +7,7 @@ import {
     type CommandIcon,
     type CommandKeys,
     CommandStore,
-    Config,
+    getShortcutText,
     I18n,
     type I18nKeys,
     type IConverter,
@@ -15,7 +15,6 @@ import {
     Logger,
     PubSub,
     Result,
-    ShortcutProfiles,
 } from "@chili3d/core";
 import { createIcon, label } from "@chili3d/element";
 import style from "./ribbonButton.module.css";
@@ -32,49 +31,58 @@ export class RibbonPushButton extends HTMLElement {
         size: ButtonSize,
         readonly onClick: () => void,
         display?: I18nKeys,
+        iconOnly = false,
     ) {
         super();
-        this.initHTML(display ?? `command.${commandName}`, icon, size);
+        this.initHTML(display ?? `command.${commandName}`, icon, size, iconOnly);
         this.addEventListener("click", onClick);
     }
 
-    static fromCommandName(commandName: CommandKeys, size: ButtonSize) {
+    /** Large buttons are icon-only; small ones show their name unless `iconOnly` is set. */
+    static fromCommandName(commandName: CommandKeys, size: ButtonSize, iconOnly = false) {
         const data = CommandStore.getComandData(commandName);
         if (!data) {
             Logger.warn(`commandData of ${commandName} is undefined`);
             return undefined;
         }
         if (data.toggle) {
-            return new RibbonToggleButton(data, size);
+            return new RibbonToggleButton(data, size, iconOnly);
         }
 
-        return new RibbonPushButton(data.key, data.icon, size, () => {
-            PubSub.default.pub("executeCommand", commandName);
-        });
+        return new RibbonPushButton(
+            data.key,
+            data.icon,
+            size,
+            () => {
+                PubSub.default.pub("executeCommand", commandName);
+            },
+            undefined,
+            iconOnly,
+        );
     }
 
     dispose(): void {
         this.removeEventListener("click", this.onClick);
     }
 
-    private initHTML(display: I18nKeys, icon: CommandIcon, size: ButtonSize) {
+    private initHTML(display: I18nKeys, icon: CommandIcon, size: ButtonSize, iconOnly: boolean) {
         const image = createIcon(icon);
         this.className = size === "large" ? style.normal : style.small;
         image.classList.add(size === "large" ? style.icon : style.smallIcon);
-        const text = label({
-            className: size === "large" ? style.largeButtonText : style.smallButtonText,
-            textContent: new Localize(display),
-        });
 
         I18n.set(this, "title", display);
         this.updateShortcut();
 
-        this.append(image, text);
+        this.append(image);
+        if (size === "small" && !iconOnly) {
+            this.append(label({ className: style.smallButtonText, textContent: new Localize(display) }));
+        } else {
+            this.classList.add(style.iconOnly);
+        }
     }
 
     updateShortcut() {
-        const shortcutData = ShortcutProfiles[Config.instance.navigation3D][this.commandName];
-        const shortcut = Array.isArray(shortcutData) ? shortcutData.join("; ") : shortcutData;
+        const shortcut = getShortcutText(this.commandName) || undefined;
 
         if (shortcut) {
             if (this.#shortcut) {
@@ -103,10 +111,17 @@ class ToggleConverter implements IConverter {
 }
 
 export class RibbonToggleButton extends RibbonPushButton {
-    constructor(data: CommandData, size: ButtonSize) {
-        super(data.key, data.icon, size, () => {
-            PubSub.default.pub("executeCommand", data.key);
-        });
+    constructor(data: CommandData, size: ButtonSize, iconOnly = false) {
+        super(
+            data.key,
+            data.icon,
+            size,
+            () => {
+                PubSub.default.pub("executeCommand", data.key);
+            },
+            undefined,
+            iconOnly,
+        );
 
         if (data.toggle) {
             data.toggle.converter = new ToggleConverter(this.className, style.checked);

@@ -1,0 +1,11 @@
+.shortcut {
+    margin-left: auto;
+    padding-left: 16px;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+    white-space: nowrap;
+
+    &:empty {
+        display: none;
+    }
+}

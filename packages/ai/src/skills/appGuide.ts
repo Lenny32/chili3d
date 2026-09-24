@@ -11,6 +11,7 @@ import {
     Navigation3D,
     Navigation3DTypes,
     ShortcutProfiles,
+    shortcutMaps,
 } from "@chili3d/core";
 import type { Skill } from "./types";
 
@@ -21,11 +22,14 @@ const COMMAND_KEYS = new Set(
 
 /** command -> display keys in the active navigation profile. */
 function activeHotkeys(): Map<string, string> {
-    const profile = ShortcutProfiles[Config.instance.navigation3D] ?? {};
+    const profile = ShortcutProfiles[Config.instance.navigation3D];
     const byCommand = new Map<string, string>();
-    for (const [command, keyOrKeys] of Object.entries(profile)) {
-        const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
-        byCommand.set(command, keys.map(formatShortcutKey).join(" / "));
+    // context maps (sketch) and the global map bind disjoint commands
+    for (const map of profile ? shortcutMaps(profile) : []) {
+        for (const [command, keyOrKeys] of Object.entries(map)) {
+            const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
+            if (!byCommand.has(command)) byCommand.set(command, keys.map(formatShortcutKey).join(" / "));
+        }
     }
     return byCommand;
 }
@@ -69,7 +73,9 @@ Use this document to TEACH. The user is sitting in front of the app and can clic
 
 This manual covers what commands DO and how the app behaves. It deliberately says nothing about where a button sits: that is the live ribbon, and get_ribbon reads it — the tabs, groups and buttons of this very session, plugins included, in the user's language, plus the commands that have no ribbon button at all (a dialog, the model tree, or hotkey only). Call it before telling anyone where to click, and believe it over this manual if the two ever disagree.
 
-Layout of the window: title bar on top (Home button, quick commands, ribbon tab headers), the ribbon below it, the viewport in the middle, the model tree and the property panel on the sides of the viewport, and a status bar at the bottom. The status bar is where a running command says what it wants next ("select models", "pick a face") — during a multi-step command, that line, not trial and error, is how the user knows what to click.`;
+Layout of the window: title bar on top (Home button, quick commands, ribbon tab headers), the ribbon below it, the viewport in the middle, the model tree and the property panel on the sides of the viewport, and a status bar at the bottom. The status bar is where a running command says what it wants next ("select models", "pick a face") — during a multi-step command, that line, not trial and error, is how the user knows what to click.
+
+Ribbon buttons are icon-only; hovering one shows its name and hotkey. Clicking a group's label (or its ▼) opens a menu listing every command of that group, including the ones without a button. {edit.commandSearch} opens a search box at the cursor: type part of a command name, then Enter runs the highlighted match. While a sketch is open its own hotkeys take over (e.g. L draws a sketch line instead of a 3D line).`;
 
 const SECTIONS = [
     `## Navigating the viewport
@@ -126,7 +132,7 @@ The workflow to teach:
 - If a feature fails, the body keeps the last shape that did build and the failing row shows the error: fix it or suppress that feature.
 - References resolve against the timeline position of the feature that owns them, so a feature added later cannot break an earlier reference.
 - Suppressed features are skipped when rebuilding but keep their place in the list.
-- The features are added from the Parametric tab: {feature.extrude} (operation New/Join/Cut/Intersect, symmetric, start offset, depth), {feature.revolve}, {feature.fillet}, {feature.chamfer}, {feature.fuse}, {feature.cut} and {feature.common}.
+- The features are added from the SOLID tab (CREATE and MODIFY groups): {feature.extrude} (operation New/Join/Cut/Intersect, symmetric, start offset, depth), {feature.revolve}, {feature.fillet}, {feature.chamfer}, {feature.fuse}, {feature.cut} and {feature.common}.
 - {feature.variable} opens the document-wide Parameters dialog: each parameter has a name, a type (length / angle / unitless), an expression and an optional description. Parameters are shared by the whole document — any feature parameter or sketch dimension may reference one by name, and a variable may reference the ones listed above it.
 - An expression takes numbers, other parameter names, + - * / %, parentheses, pi/e, and abs, sqrt, floor, ceil, round, min, max, sin, cos, tan, asin, acos, atan, atan2 — angles are in degrees throughout. Types are checked: a length parameter in an angle slot is an error, sqrt wants even exponents, and a variable cannot reference one declared below it.`,
 

@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ButtonSize, type CommandIcon, Localize, type PulldownButton } from "@chili3d/core";
+import { type ButtonSize, type CommandIcon, I18n, Localize, type PulldownButton } from "@chili3d/core";
 import { createIcon, div, label } from "@chili3d/element";
 import { createDropdownItem, DropdownController } from "./dropdownController";
 import buttonStyle from "./ribbonButton.module.css";
@@ -29,14 +29,13 @@ export class RibbonPulldownButton extends HTMLElement {
         this.className = this.size === "large" ? style.pulldown : style.pulldownSmall;
         icon.classList.add(this.size === "large" ? buttonStyle.icon : buttonStyle.smallIcon);
 
-        this.append(
-            icon,
-            label({
-                className: this.size === "large" ? style.text : style.smallText,
-                textContent: new Localize(this.data.display),
-            }),
-            div({ className: this.size === "large" ? style.arrow : style.smallArrow }),
-        );
+        // large pulldowns are icon-only; the name lives in the tooltip
+        I18n.set(this, "title", this.data.display);
+        this.append(icon);
+        if (this.size !== "large") {
+            this.append(label({ className: style.smallText, textContent: new Localize(this.data.display) }));
+        }
+        this.append(div({ className: this.size === "large" ? style.arrow : style.smallArrow }));
     }
 
     private readonly toggleDropdown = (e: Event) => {

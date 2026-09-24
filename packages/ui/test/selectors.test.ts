@@ -134,9 +134,8 @@ describe("Navigation3DSelector", () => {
         const currentNav = Config.instance.navigation3D;
         const currentIndex = Navigation3DTypes.indexOf(currentNav as (typeof Navigation3DTypes)[number]);
         const el = Navigation3DSelector({}) as HTMLSelectElement;
-        if (currentIndex >= 0) {
-            expect(el.options[currentIndex]?.selected).toBe(true);
-        }
+        expect(currentIndex).toBeGreaterThanOrEqual(0);
+        expect(el.selectedIndex).toBe(currentIndex);
     });
 
     test("should apply custom HTML props", () => {

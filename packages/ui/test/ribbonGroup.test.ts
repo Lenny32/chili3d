@@ -16,6 +16,8 @@ rs.mock("../src/ribbon/ribbonGroup.module.css", () => ({
     collapsedDropdownItem: "rg-collapsed-item",
     collapsedDropdownIcon: "rg-collapsed-icon",
     collapsedDropdownText: "rg-collapsed-text",
+    separator: "rg-separator",
+    finish: "rg-finish",
 }));
 
 rs.mock("../src/ribbon/ribbonStack.module.css", () => ({
@@ -66,7 +68,12 @@ rs.mock("../src/ribbon/ribbonSplitButton.module.css", () => ({
 import "./_helpers/mockElementRealEvents";
 
 import { RibbonPushButton } from "../src/ribbon/ribbonButton";
-import { createRibbonButton, RibbonGroupElement } from "../src/ribbon/ribbonGroup";
+import {
+    createRibbonButton,
+    flattenGroupItems,
+    groupMenuItems,
+    RibbonGroupElement,
+} from "../src/ribbon/ribbonGroup";
 import { RibbonPulldownButton } from "../src/ribbon/ribbonPulldownButton";
 import { RibbonSplitButton } from "../src/ribbon/ribbonSplitButton";
 import { RibbonStack } from "../src/ribbon/ribbonStack";
@@ -74,6 +81,8 @@ import { mustQuery } from "./_helpers/domHelpers";
 
 const CMD_A = "test.group.a" as unknown as CommandKeys;
 const CMD_B = "test.group.b" as unknown as CommandKeys;
+const CMD_C = "test.group.c" as unknown as CommandKeys;
+const CMD_D = "test.group.d" as unknown as CommandKeys;
 
 class TestCommand {
     async execute() {}
@@ -217,5 +226,86 @@ describe("RibbonGroupElement", () => {
             el.dispose();
             el.remove();
         }
+    });
+});
+
+describe("group menu", () => {
+    test("should invoke a custom button callback and close without dispatching its command", () => {
+        const onClick = rs.fn(() => {});
+        const published = rs.fn((_command: CommandKeys) => {});
+        const button = { ...makePushButton(CMD_A), onClick };
+        const el = new RibbonGroupElement(makeGroup([button]));
+        PubSub.default.sub("executeCommand", published);
+        document.body.appendChild(el);
+        try {
+            mustQuery(el, ".rg-header").click();
+            mustQuery(document.body, ".rg-collapsed-item").click();
+            expect(onClick).toHaveBeenCalledTimes(1);
+            expect(published).not.toHaveBeenCalled();
+            expect(document.body.querySelector(".rg-collapsed-dropdown")).toBeNull();
+        } finally {
+            PubSub.default.remove("executeCommand", published);
+            el.dispose();
+            el.remove();
+        }
+    });
+
+    const menuKeys = (items: (PushButton | CommandKeys)[]) =>
+        items.map((x) => (typeof x === "string" ? x : x.command));
+
+    afterEach(() => {
+        for (const key of [CMD_A, CMD_B, CMD_C, CMD_D]) CommandStore.unregisterCommand(key);
+        document.body.querySelectorAll(".rg-collapsed-dropdown").forEach((el) => el.remove());
+    });
+
+    test("flattenGroupItems should expand stacks, split and pulldown buttons", () => {
+        const items: RibbonCommand[] = [
+            CMD_A,
+            new ObservableCollection(CMD_B, CMD_C),
+            { type: "split", items: [CMD_D, CMD_A] } as RibbonCommand,
+            { type: "pulldown", icon: "i", display: "x" as never, items: [CMD_B] } as RibbonCommand,
+            makePushButton(CMD_C),
+        ];
+        expect(menuKeys(flattenGroupItems(items))).toEqual([CMD_A, CMD_B, CMD_C, CMD_D, CMD_A, CMD_B, CMD_C]);
+    });
+
+    test("groupMenuItems should list each command once, buttons before menu-only items", () => {
+        const group = makeGroup([CMD_A, new ObservableCollection(CMD_B, CMD_A)], [CMD_B, CMD_C]);
+        const { items, collapsed } = groupMenuItems(group);
+        expect(menuKeys(items)).toEqual([CMD_A, CMD_B]);
+        expect(menuKeys(collapsed)).toEqual([CMD_C]);
+    });
+
+    test("clicking the label should open a menu of every item, a separator, then collapsed items", () => {
+        for (const key of [CMD_A, CMD_B, CMD_C, CMD_D]) {
+            CommandStore.registerCommand(TestCommand, { key, icon: "icon-x" });
+        }
+        const group = makeGroup([CMD_A, new ObservableCollection(CMD_B, CMD_C)], [CMD_D]);
+        const el = new RibbonGroupElement(group);
+        document.body.appendChild(el);
+        try {
+            mustQuery(el, ".rg-header").click();
+            const dropdown = mustQuery(document.body, ".rg-collapsed-dropdown");
+            const children = [...dropdown.children];
+            expect(children.map((c) => c.className)).toEqual([
+                "rg-collapsed-item",
+                "rg-collapsed-item",
+                "rg-collapsed-item",
+                "rg-separator",
+                "rg-collapsed-item",
+            ]);
+        } finally {
+            el.dispose();
+            el.remove();
+        }
+    });
+
+    test("a primary group should get the finish class", () => {
+        const group = RibbonGroup.fromProfile({
+            groupName: "ribbon.group.finish",
+            items: [],
+            primary: true,
+        });
+        expect(new RibbonGroupElement(group).className).toBe("rg-group rg-finish");
     });
 });

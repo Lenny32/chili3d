@@ -1,7 +1,15 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { formatShortcutKey, I18N_KEYS, Navigation3DTypes, ShortcutProfiles } from "../src";
+import {
+    formatShortcutKey,
+    getShortcutKeys,
+    getShortcutText,
+    I18N_KEYS,
+    Navigation3DTypes,
+    ShortcutProfiles,
+    shortcutMaps,
+} from "../src";
 
 const MODIFIER_KEYS = new Set(["ctrl", "shift", "alt"]);
 
@@ -9,8 +17,16 @@ const VALID_COMMAND_KEYS = new Set(
     I18N_KEYS.filter((key) => key.startsWith("command.")).map((key) => key.slice("command.".length)),
 );
 
+/** Every map of every profile, named "Profile" for the global map and "Profile.context" otherwise. */
 function profileEntries(): [string, Record<string, string | string[]>][] {
-    return Object.entries(ShortcutProfiles) as [string, Record<string, string | string[]>][];
+    const entries: [string, Record<string, string | string[]>][] = [];
+    for (const [profile, { global, ...contexts }] of Object.entries(ShortcutProfiles)) {
+        entries.push([profile, global as Record<string, string | string[]>]);
+        for (const [context, map] of Object.entries(contexts)) {
+            entries.push([`${profile}.${context}`, map as Record<string, string | string[]>]);
+        }
+    }
+    return entries;
 }
 
 function shortcutsOf(map: Record<string, string | string[]>): [string, string][] {
@@ -154,6 +170,64 @@ describe("ShortcutProfiles duplicate bindings", () => {
         // so HotkeyService silently overwrites the rect binding when loading this profile.
         const knownIssues = ['Blender: "r" -> create.rect, modify.rotate'];
         expect(duplicates, `duplicate shortcuts:\n${duplicates.join("\n")}`).toEqual(knownIssues);
+    });
+});
+
+describe("Fusion360 profile", () => {
+    test.each([
+        ["edit.commandSearch", ["s"]],
+        ["feature.extrude", ["e", "q"]],
+        ["feature.fillet", ["f"]],
+        ["modify.move", ["m"]],
+        ["measure.length", ["i", "d"]],
+        ["create.line", ["l"]],
+        ["edit.redo", ["ctrl+y", "ctrl+shift+z"]],
+    ] as const)("global %s should be bound to %j", (command, keys) => {
+        expect(ShortcutProfiles.Fusion360.global[command]).toEqual(keys.length === 1 ? keys[0] : keys);
+    });
+
+    test.each([
+        ["sketch.line", "l"],
+        ["sketch.rectangle", "r"],
+        ["sketch.circle", "c"],
+        ["dimension.distance", "d"],
+        ["sketch.projectEdges", "p"],
+        ["sketch.toggleExternal", "x"],
+    ] as const)("sketch %s should be bound to %s", (command, key) => {
+        expect(ShortcutProfiles.Fusion360.sketch?.[command]).toBe(key);
+    });
+
+    test("no command should be bound in both the global and the sketch map", () => {
+        const { global, sketch } = ShortcutProfiles.Fusion360;
+        const both = Object.keys(sketch ?? {}).filter((command) => command in global);
+        expect(both).toEqual([]);
+    });
+});
+
+describe("shortcutMaps", () => {
+    test("should put context maps before the global map", () => {
+        const profile = ShortcutProfiles.Fusion360;
+        expect(shortcutMaps(profile)).toEqual([profile.sketch, profile.global]);
+    });
+
+    test("should return only the global map for a profile without contexts", () => {
+        expect(shortcutMaps(ShortcutProfiles.Chili3d)).toEqual([ShortcutProfiles.Chili3d.global]);
+    });
+});
+
+describe("getShortcutText", () => {
+    test("should format every binding of a global command", () => {
+        expect(getShortcutText("edit.redo", "Fusion360")).toBe("Ctrl+Y / Ctrl+Shift+Z");
+    });
+
+    test("should find sketch-context commands too", () => {
+        expect(getShortcutText("sketch.line", "Fusion360")).toBe("L");
+        expect(getShortcutKeys("dimension.distance", "Fusion360")).toEqual(["d"]);
+    });
+
+    test("should be empty for an unbound command", () => {
+        expect(getShortcutText("sketch.line", "Chili3d")).toBe("");
+        expect(getShortcutKeys("sketch.line", "Chili3d")).toEqual([]);
     });
 });
 

@@ -14,7 +14,7 @@ export const Navigation3DSelector = (props: HTMLProps<HTMLElement>) => {
             }),
         ),
     );
-    return select(
+    const el = select(
         {
             onchange: (e) => {
                 const index = (e.target as HTMLSelectElement).selectedIndex;
@@ -23,5 +23,8 @@ export const Navigation3DSelector = (props: HTMLProps<HTMLElement>) => {
             ...props,
         },
         ...nav3DTypes,
-    );
+    ) as HTMLSelectElement;
+    // `selected` set before insertion is not honoured everywhere; pin the index explicitly
+    el.selectedIndex = Navigation3DTypes.indexOf(Config.instance.navigation3D);
+    return el;
 };

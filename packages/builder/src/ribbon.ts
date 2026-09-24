@@ -3,12 +3,90 @@
 
 import type { RibbonTabKeys, RibbonTabProfile } from "@chili3d/core";
 
+/**
+ * Fusion 360-style layout: workflow tabs, task-named groups. Only direct-modeling commands live
+ * here so the ribbon works without `useParametric()`; the parametric and sketch profiles prepend
+ * their `feature.*` / `sketch.*` commands to the same groups.
+ */
 export const DefaultRibbon: RibbonTabProfile[] = [
     {
-        tabName: "ribbon.tab.model",
+        tabName: "ribbon.tab.solid",
         groups: [
             {
-                groupName: "ribbon.group.draw",
+                groupName: "ribbon.group.create",
+                items: [
+                    "create.sweep",
+                    "create.loft",
+                    {
+                        type: "split",
+                        items: [
+                            "create.box",
+                            "create.cylinder",
+                            "create.sphere",
+                            "create.cone",
+                            "create.pyramid",
+                        ],
+                    },
+                ],
+                collapsedItems: [
+                    "create.extrude",
+                    "create.revol",
+                    "create.pipe",
+                    "create.helix",
+                    "create.thickSolid",
+                    "modify.array",
+                    "modify.mirror",
+                ],
+            },
+            {
+                groupName: "ribbon.group.modify",
+                items: ["modify.shell", "modify.move"],
+                collapsedItems: [
+                    "modify.rotate",
+                    "modify.split",
+                    "modify.removeFeature",
+                    "modify.fillet",
+                    "modify.chamfer",
+                    "boolean.join",
+                    "boolean.cut",
+                    "boolean.common",
+                    "modify.simplifyShape",
+                    "modify.explode",
+                    "modify.paintBucket",
+                    "modify.brushAdd",
+                    "modify.brushRemove",
+                    "modify.brushClear",
+                    "modify.deleteNode",
+                    "modify.removeShapes",
+                ],
+            },
+            {
+                groupName: "ribbon.group.assemble",
+                items: ["create.group"],
+                collapsedItems: ["create.folder"],
+            },
+            {
+                groupName: "ribbon.group.construct",
+                items: ["workingPlane.set", "workingPlane.toggleDynamic"],
+                collapsedItems: ["workingPlane.alignToPlane", "workingPlane.fromSection"],
+            },
+            {
+                groupName: "ribbon.group.inspect",
+                items: ["measure.length", "measure.angle"],
+                collapsedItems: ["measure.select", "create.section", "modify.checkShape"],
+            },
+            {
+                groupName: "ribbon.group.insert",
+                items: ["file.import"],
+                collapsedItems: ["convert.curveProjection"],
+            },
+        ],
+    },
+    {
+        tabName: "ribbon.tab.surface",
+        groups: [
+            {
+                groupName: "ribbon.group.create",
                 items: [
                     "create.line",
                     {
@@ -19,97 +97,38 @@ export const DefaultRibbon: RibbonTabProfile[] = [
                         type: "split",
                         items: ["create.arc", "create.arc2point", "create.arc3point", "create.arcTTR"],
                     },
-                    {
-                        type: "split",
-                        items: [
-                            "create.box",
-                            "create.sphere",
-                            "create.cylinder",
-                            "create.cone",
-                            "create.pyramid",
-                        ],
-                    },
                     "create.extrude",
-                    ["create.loft", "create.sweep", "create.revol"],
+                    "create.offset",
                 ],
                 collapsedItems: [
                     "create.point",
                     "create.polygon",
                     "create.bezier",
-                    "create.helix",
-                    "create.pipe",
+                    "create.revol",
+                    "create.sweep",
+                    "create.loft",
+                    "create.thickSolid",
                 ],
             },
             {
                 groupName: "ribbon.group.modify",
-                items: [
-                    "modify.move",
-                    ["modify.rotate", "modify.mirror", "modify.array"],
-                    ["modify.trim", "modify.extend", "modify.shell"],
-                    ["modify.split", "modify.sew", "modify.simplifyShape"],
-                    ["modify.fillet", "modify.chamfer", "modify.explode"],
-                    ["modify.deleteNode", "modify.removeShapes", "modify.removeFeature"],
-                ],
-                collapsedItems: [
-                    "modify.break",
-                    "modify.paintBucket",
-                    "modify.brushAdd",
-                    "modify.brushRemove",
-                    "modify.brushClear",
-                ],
+                items: ["modify.trim", "modify.extend", "modify.sew", "modify.split"],
+                collapsedItems: ["modify.break", "create.copyShape", "modify.repairShape"],
             },
             {
-                groupName: "ribbon.group.converter",
-                items: [
-                    "convert.toWire",
-                    "convert.toCompound",
-                    ["convert.toFace", "convert.toShell", "convert.toSolid"],
-                ],
-            },
-            {
-                groupName: "ribbon.group.boolean",
-                items: [["boolean.common", "boolean.cut", "boolean.join"]],
-            },
-            {
-                groupName: "ribbon.group.workingPlane",
-                items: [
-                    "workingPlane.toggleDynamic",
-                    ["workingPlane.set", "workingPlane.alignToPlane", "workingPlane.fromSection"],
-                ],
-            },
-            {
-                groupName: "ribbon.group.tools",
-                items: [
-                    "convert.curveProjection",
-                    "create.group",
-                    ["create.section", "create.offset", "create.copyShape"],
-                ],
-                collapsedItems: ["modify.repairShape", "modify.checkShape"],
-            },
-            {
-                groupName: "ribbon.group.measure",
-                items: [["measure.length", "measure.angle", "measure.select"]],
-            },
-            {
-                groupName: "ribbon.group.act",
-                items: ["act.alignCamera"],
-            },
-            {
-                groupName: "ribbon.group.importExport",
-                items: ["file.import", "file.export"],
-            },
-            {
-                groupName: "ribbon.group.other",
-                items: ["ai.toggleChat"],
+                groupName: "ribbon.group.convert",
+                items: ["convert.toWire", "convert.toFace", "convert.toSolid"],
+                collapsedItems: ["convert.toShell", "convert.toCompound"],
             },
         ],
     },
     {
-        tabName: "ribbon.tab.manager",
+        tabName: "ribbon.tab.utilities",
         groups: [
             {
-                groupName: "ribbon.group.other",
-                items: ["test.performance"],
+                groupName: "ribbon.group.tools",
+                items: ["ai.toggleChat", "act.alignCamera"],
+                collapsedItems: ["test.performance"],
             },
         ],
     },
@@ -120,24 +139,24 @@ export type RibbonProfileExtra = RibbonTabProfile & { before?: RibbonTabKeys };
 
 /**
  * Ribbon contributions of the parametric module, applied by `AppBuilder.useParametric`.
- * Feature commands join the parametric tab next to the sketch group.
+ * Feature commands are prepended to the SOLID groups so they come before the direct ones.
  */
 export const ParametricRibbonProfiles: RibbonProfileExtra[] = [
     {
-        tabName: "ribbon.tab.parametric",
-        before: "ribbon.tab.manager",
+        tabName: "ribbon.tab.solid",
         groups: [
             {
-                groupName: "ribbon.group.feature",
-                items: ["feature.extrude", "feature.revolve", "feature.fillet", "feature.chamfer"],
+                groupName: "ribbon.group.create",
+                items: ["feature.extrude", "feature.revolve"],
             },
             {
-                groupName: "ribbon.group.boolean",
-                items: [["feature.fuse", "feature.cut", "feature.common"]],
-            },
-            {
-                groupName: "ribbon.group.other",
-                items: ["feature.variable"],
+                groupName: "ribbon.group.modify",
+                items: [
+                    "feature.fillet",
+                    "feature.chamfer",
+                    { type: "split", items: ["feature.fuse", "feature.cut", "feature.common"] },
+                ],
+                collapsedItems: ["feature.variable"],
             },
         ],
     },
@@ -185,6 +204,8 @@ function mergeTab(result: RibbonTabProfile[], extra: RibbonProfileExtra): void {
             tab.groups.push(group);
         } else {
             existing.items.unshift(...group.items);
+            existing.iconOnly = existing.iconOnly || group.iconOnly;
+            existing.primary = existing.primary || group.primary;
             if (group.collapsedItems !== undefined) {
                 existing.collapsedItems = [...group.collapsedItems, ...(existing.collapsedItems ?? [])];
             }

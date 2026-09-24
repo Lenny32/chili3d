@@ -22,12 +22,16 @@ describe("Navigation3DTypes", () => {
         expect(Navigation3DTypes).toContain("Creo");
     });
 
+    test("should contain Fusion360", () => {
+        expect(Navigation3DTypes).toContain("Fusion360");
+    });
+
     test("should contain Solidworks", () => {
         expect(Navigation3DTypes).toContain("Solidworks");
     });
 
     test("should have exactly 5 navigation types", () => {
-        expect(Navigation3DTypes).toHaveLength(5);
+        expect(Navigation3DTypes).toHaveLength(6);
     });
 });
 
@@ -163,6 +167,15 @@ describe("Navigation3D.navigationKeyMap", () => {
             Config.instance.init("testNavigation");
             Config.instance.navigation3D = "Solidworks";
             expect(Navigation3D.navigationKeyMap().rotate).toBe("Middle");
+        });
+    });
+
+    describe("Fusion360", () => {
+        test("should pan with Middle and rotate with Shift+Middle", () => {
+            expect(Navigation3D.navigationKeyMap("Fusion360")).toEqual({
+                pan: "Middle",
+                rotate: "Shift+Middle",
+            });
         });
     });
 });

@@ -14,6 +14,7 @@ import {
     type RibbonGroup,
     type RibbonTab,
     ShortcutProfiles,
+    shortcutMaps,
 } from "@chili3d/core";
 import type { Tool } from "../llm/types";
 
@@ -31,11 +32,14 @@ const translate = (key: I18nKeys) => I18n.translate(key);
 
 /** The active profile's bindings, inverted to command -> display keys ("Ctrl+S"). */
 function hotkeysOfCurrentProfile(): Map<string, string> {
-    const profile = ShortcutProfiles[Config.instance.navigation3D] ?? {};
+    const profile = ShortcutProfiles[Config.instance.navigation3D];
     const byCommand = new Map<string, string>();
-    for (const [command, keyOrKeys] of Object.entries(profile)) {
-        const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
-        byCommand.set(command, keys.map(formatShortcutKey).join(" / "));
+    // context maps (sketch) and the global map bind disjoint commands
+    for (const map of profile ? shortcutMaps(profile) : []) {
+        for (const [command, keyOrKeys] of Object.entries(map)) {
+            const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
+            if (!byCommand.has(command)) byCommand.set(command, keys.map(formatShortcutKey).join(" / "));
+        }
     }
     return byCommand;
 }

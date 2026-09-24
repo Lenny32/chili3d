@@ -69,7 +69,8 @@ export class CommandService implements IService {
                 Logger.error(err);
             })
             .finally(() => {
-                this.app.lastCommand = commandName;
+                // Opening the command picker must preserve the command users can repeat.
+                if (commandName !== "edit.commandSearch") this.app.lastCommand = commandName;
                 this.app.executingCommand = undefined;
             });
     }

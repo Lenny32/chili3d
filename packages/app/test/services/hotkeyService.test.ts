@@ -2,10 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import type { CommandKeys, IApplication, IView } from "@chili3d/core";
-import { PubSub } from "@chili3d/core";
+import { Config, type Navigation3DType, PubSub } from "@chili3d/core";
 import { createMockApplication } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, test } from "@rstest/core";
-import { type HotkeyMap, HotkeyService } from "../../src/services/hotkeyService";
+import { type HotkeyMap, HotkeyService, normalizeShortcut } from "../../src/services/hotkeyService";
 
 describe("HotkeyService", () => {
     let service: HotkeyService;
@@ -376,6 +376,91 @@ describe("HotkeyService", () => {
             expect(() => {
                 window.dispatchEvent(event);
             }).not.toThrow();
+        });
+    });
+
+    // ── Fusion360 profile & context layers ───────────────────────────
+
+    describe("Fusion360 contexts", () => {
+        let originalNav: Navigation3DType;
+        let fusion: HotkeyService;
+
+        beforeEach(() => {
+            originalNav = Config.instance.navigation3D;
+            Config.instance.navigation3D = "Fusion360";
+            fusion = new HotkeyService();
+        });
+
+        afterEach(() => {
+            fusion.stop();
+            Config.instance.navigation3D = originalNav;
+            PubSub.default.removeAll("pushShortcutContext");
+            PubSub.default.removeAll("popShortcutContext");
+        });
+
+        test.each([
+            ["e", "feature.extrude"],
+            ["q", "feature.extrude"],
+            ["f", "feature.fillet"],
+            ["m", "modify.move"],
+            ["i", "measure.length"],
+            ["s", "edit.commandSearch"],
+            ["l", "create.line"],
+        ] as const)("global %s should run %s", (key, command) => {
+            expect(fusion.getCommand({ key })).toBe(command);
+        });
+
+        test("a pushed sketch context should win over the global map", () => {
+            const handle = fusion.pushContext("sketch");
+            expect(fusion.activeContext).toBe("sketch");
+            expect(fusion.getCommand({ key: "l" })).toBe("sketch.line");
+            expect(fusion.getCommand({ key: "d" })).toBe("dimension.distance");
+            // keys the context does not bind fall through to the global map
+            expect(fusion.getCommand({ key: "f" })).toBe("feature.fillet");
+            handle.dispose();
+        });
+
+        test("disposing the context should restore the global map", () => {
+            const handle = fusion.pushContext("sketch");
+            handle.dispose();
+            expect(fusion.activeContext).toBeUndefined();
+            expect(fusion.getCommand({ key: "l" })).toBe("create.line");
+            expect(fusion.getCommand({ key: "d" })).toBe("measure.length");
+        });
+
+        test("disposing a handle twice should pop only once", () => {
+            const outer = fusion.pushContext("sketch");
+            const inner = fusion.pushContext("sketch");
+            inner.dispose();
+            inner.dispose();
+            expect(fusion.activeContext).toBe("sketch");
+            outer.dispose();
+            expect(fusion.activeContext).toBeUndefined();
+        });
+
+        test("push/pop PubSub events should drive the context once started", () => {
+            fusion.start();
+            PubSub.default.pub("pushShortcutContext", "sketch");
+            expect(fusion.getCommand({ key: "r" })).toBe("sketch.rectangle");
+            PubSub.default.pub("popShortcutContext", "sketch");
+            expect(fusion.getCommand({ key: "r" })).toBe("create.rect");
+        });
+
+        test("Ctrl+Shift+Z should run redo", () => {
+            expect(fusion.getCommand({ key: "z", ctrlKey: true, shiftKey: true })).toBe("edit.redo");
+        });
+    });
+
+    describe("normalizeShortcut", () => {
+        test.each([
+            ["ctrl+shift+z", "ctrl+shift+z"],
+            ["shift+ctrl+z", "ctrl+shift+z"],
+            ["Shift+Alt+X", "alt+shift+x"],
+            ["m+v", "m+v"],
+            ["ctrl+m+v", "ctrl+m+v"],
+            [" ", " "],
+        ])("%j -> %j", (spec, expected) => {
+            expect(normalizeShortcut(spec)).toBe(expected);
         });
     });
 });

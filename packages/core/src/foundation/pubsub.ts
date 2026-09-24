@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { CommandKeys, ICommand } from "../command";
+import type { CommandKeys, ICommand, ShortcutContext } from "../command";
 import type { IDocument } from "../document";
 import type { I18nKeys } from "../i18n";
 import type { Material } from "../material";
@@ -29,7 +29,10 @@ export interface PubSubEventMap {
     modelUpdate: (model: INode) => void;
     nodeDoubleClicked: (node: INode) => void;
     openCommandContext: (command: ICommand) => void;
+    openCommandSearch: () => void;
     parentVisibleChanged: (model: INode) => void;
+    popShortcutContext: (context: ShortcutContext) => void;
+    pushShortcutContext: (context: ShortcutContext) => void;
     showDialog: (title: I18nKeys, content: HTMLElement, buttons?: DialogButton[] | (() => void)) => void;
     showFloatPanel: (options: FloatPanelOptions) => void;
     showFloatTip: (dom: HTMLElement | { level: MessageType; msg: string }) => void;

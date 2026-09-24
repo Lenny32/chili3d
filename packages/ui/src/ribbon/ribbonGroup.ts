@@ -2,11 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import {
-    Binding,
-    type IConverter,
+    type CommandKeys,
     Localize,
     ObservableCollection,
-    Result,
+    type PushButton,
     type RibbonCommand,
     type RibbonGroup,
 } from "@chili3d/core";
@@ -18,13 +17,14 @@ import { RibbonPulldownButton } from "./ribbonPulldownButton";
 import { RibbonSplitButton } from "./ribbonSplitButton";
 import { RibbonStack } from "./ribbonStack";
 
-export function createRibbonButton(item: RibbonCommand): HTMLElement {
+/** `iconOnly` drops the names of stacked small buttons (large buttons are always icon-only). */
+export function createRibbonButton(item: RibbonCommand, iconOnly = false): HTMLElement {
     if (typeof item === "string") {
         return RibbonPushButton.fromCommandName(item, "large")!;
     } else if (item instanceof ObservableCollection) {
         const stack = new RibbonStack();
         item.forEach((b) => {
-            const button = RibbonPushButton.fromCommandName(b, "small");
+            const button = RibbonPushButton.fromCommandName(b, "small", iconOnly);
             if (button) stack.append(button);
         });
         return stack;
@@ -39,12 +39,39 @@ export function createRibbonButton(item: RibbonCommand): HTMLElement {
     }
 }
 
-class DisplayConverter implements IConverter<number> {
-    constructor(readonly predicate: (value: number) => boolean) {}
+type MenuItem = PushButton | CommandKeys;
 
-    convert(value: number): Result<string> {
-        return Result.ok(this.predicate(value) ? "" : "none");
+/** Every command a group's buttons reach — stacks, split and pulldown buttons expanded. */
+export function flattenGroupItems(items: Iterable<RibbonCommand>): MenuItem[] {
+    const result: MenuItem[] = [];
+    for (const item of items) {
+        if (typeof item === "string") {
+            result.push(item);
+        } else if (item instanceof ObservableCollection) {
+            result.push(...item);
+        } else if (item.type === "push") {
+            result.push(item);
+        } else {
+            result.push(...item.items);
+        }
     }
+    return result;
+}
+
+const menuKey = (item: MenuItem) => (typeof item === "string" ? item : item.command);
+
+/** The group ▼ menu: flattened buttons, then the menu-only items, each command listed once. */
+export function groupMenuItems(group: RibbonGroup): { items: MenuItem[]; collapsed: MenuItem[] } {
+    const seen = new Set<CommandKeys>();
+    const unique = (list: MenuItem[]) =>
+        list.filter((item) => {
+            const key = menuKey(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+        });
+    const items = unique(flattenGroupItems(group.items));
+    return { items, collapsed: unique([...group.collapsedItems]) };
 }
 
 export class RibbonGroupElement extends HTMLElement {
@@ -52,7 +79,7 @@ export class RibbonGroupElement extends HTMLElement {
 
     constructor(readonly group: RibbonGroup) {
         super();
-        this.className = style.ribbonGroup;
+        this.className = group.primary ? `${style.ribbonGroup} ${style.finish}` : style.ribbonGroup;
         this.initHTML();
     }
 
@@ -65,46 +92,41 @@ export class RibbonGroupElement extends HTMLElement {
             collection({
                 className: style.content,
                 sources: this.group.items,
-                template: (item) => createRibbonButton(item),
+                template: (item) => createRibbonButton(item, this.group.iconOnly),
             }),
             div(
-                { className: style.headerContainer },
+                { className: style.headerContainer, onclick: this.toggleDropdown },
                 label({ className: style.header, textContent: new Localize(this.group.groupName) }),
-                div({
-                    className: style.arrow,
-                    style: {
-                        display: new Binding(
-                            this.group.collapsedItems,
-                            "length",
-                            new DisplayConverter((l: number) => l > 0),
-                        ),
-                    },
-                    onclick: (e) => {
-                        e.stopPropagation();
-                        if (this.#dropdown.isOpened) {
-                            this.#dropdown.close();
-                        } else {
-                            this.openDropdown((e.currentTarget as HTMLElement).parentElement as HTMLElement);
-                        }
-                    },
-                }),
+                div({ className: style.arrow }),
             ),
         );
     }
 
-    private openDropdown(anchorEl: HTMLElement) {
-        if (this.#dropdown.isOpened || this.group.collapsedItems.length === 0) return;
+    private readonly toggleDropdown = (e: MouseEvent) => {
+        e.stopPropagation();
+        if (this.#dropdown.isOpened) {
+            this.#dropdown.close();
+        } else {
+            this.openDropdown(e.currentTarget as HTMLElement);
+        }
+    };
 
+    private openDropdown(anchorEl: HTMLElement) {
+        const { items, collapsed } = groupMenuItems(this.group);
+        if (this.#dropdown.isOpened || items.length + collapsed.length === 0) return;
+
+        const classes = {
+            item: style.collapsedDropdownItem,
+            icon: style.collapsedDropdownIcon,
+            text: style.collapsedDropdownText,
+        };
         this.#dropdown.open(anchorEl, (dropdown) => {
-            for (const cmdKey of this.group.collapsedItems) {
-                dropdown.append(
-                    createDropdownItem(cmdKey, () => this.#dropdown.close(), {
-                        item: style.collapsedDropdownItem,
-                        icon: style.collapsedDropdownIcon,
-                        text: style.collapsedDropdownText,
-                    }),
-                );
+            const close = () => this.#dropdown.close();
+            for (const item of items) dropdown.append(createDropdownItem(item, close, classes));
+            if (items.length > 0 && collapsed.length > 0) {
+                dropdown.append(div({ className: style.separator }));
             }
+            for (const item of collapsed) dropdown.append(createDropdownItem(item, close, classes));
         });
     }
 }

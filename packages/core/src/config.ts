@@ -119,7 +119,7 @@ export class Config extends Observable {
 
     @serialize()
     get navigation3D() {
-        return this.getPrivateValue("navigation3D", "Chili3d");
+        return this.getPrivateValue("navigation3D", "Fusion360");
     }
     set navigation3D(value: Navigation3DType) {
         this.setProperty("navigation3D", value);

@@ -11,6 +11,7 @@ import {
     type Ribbon,
 } from "@chili3d/core";
 import { div } from "@chili3d/element";
+import { CommandSearch } from "./commandSearch";
 import style from "./editor.module.css";
 import { FloatPanel } from "./floatPanel";
 import { ProjectView } from "./project";
@@ -218,6 +219,7 @@ export class Editor extends HTMLElement {
         PubSub.default.sub("editMaterial", this._handleMaterialEdit);
         PubSub.default.sub("editVariables", this._handleVariablesEdit);
         PubSub.default.sub("openCommandContext", this.openContext);
+        PubSub.default.sub("openCommandSearch", this.openCommandSearch);
         PubSub.default.sub("closeCommandContext", this.closeContext);
         PubSub.default.sub("toggleChatPanel", this.toggleChat);
     }
@@ -226,6 +228,7 @@ export class Editor extends HTMLElement {
         PubSub.default.remove("editMaterial", this._handleMaterialEdit);
         PubSub.default.remove("editVariables", this._handleVariablesEdit);
         PubSub.default.remove("openCommandContext", this.openContext);
+        PubSub.default.remove("openCommandSearch", this.openCommandSearch);
         PubSub.default.remove("closeCommandContext", this.closeContext);
         PubSub.default.remove("toggleChatPanel", this.toggleChat);
         this.chatDock?.remove();
@@ -240,6 +243,10 @@ export class Editor extends HTMLElement {
         this.commandContext = new CommandContext(command);
         this._commandContextContainer.append(this.commandContext);
         this._viewportContainer.append(this._commandContextContainer);
+    };
+
+    private readonly openCommandSearch = () => {
+        CommandSearch.open();
     };
 
     private readonly closeContext = () => {

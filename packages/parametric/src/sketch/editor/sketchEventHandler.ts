@@ -307,6 +307,11 @@ export class SketchEventHandler implements IEventHandler {
         if (preview !== undefined) {
             preview(this.pointerToUV(view, event));
         }
+        if (this.editor.annotations.hasGeometryPreview) {
+            this.clearHover(view);
+            this.syncAnnotationHighlights();
+            return;
+        }
         this.updateHover(view, event);
     }
 
@@ -851,7 +856,7 @@ function arcSegmentMesh(
 }
 
 /** uv distance to an entity's curve: segment, arc sweep, or circle circumference. */
-function entityDistance(uv: [number, number], entity: SketchEntityData): number {
+export function entityDistance(uv: [number, number], entity: SketchEntityData): number {
     const [x1, y1, x2, y2] = entity.params;
     if (entity.type === "point") return Math.hypot(uv[0] - x1, uv[1] - y1);
     if (entity.type === "ellipse") {

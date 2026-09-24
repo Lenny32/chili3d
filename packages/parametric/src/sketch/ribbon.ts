@@ -40,6 +40,10 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                 collapsedItems: ["sketch.toggleExternal"],
             },
             {
+                groupName: "ribbon.group.modify",
+                items: ["sketch.trim", "sketch.extend", "sketch.split", "sketch.offset"],
+            },
+            {
                 groupName: "ribbon.group.constraint",
                 iconOnly: true,
                 items: [

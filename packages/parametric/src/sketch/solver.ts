@@ -10,6 +10,7 @@ import {
     ExternalEntityRegistry,
     type ExternalPins,
 } from "./externalEntities";
+import { editableCurve, type GeometryEdit } from "./geometryEditing";
 import type { SolverSystem } from "./planegcs";
 import { newSolverSystem } from "./planegcs";
 import {
@@ -285,6 +286,92 @@ export class SketchSolver implements ExternalEntityHost {
             this.system.remove_param(datumParamId);
         }
         this.constraints.delete(id);
+        this._datumErrors.delete(id);
+    }
+
+    /** Apply a previewed edit, tracking old points onto surviving endpoints and centers. */
+    applyGeometryEdit(edit: GeometryEdit): Result<{ entityIds: number[]; removedConstraints: number[] }> {
+        const current = this.entity(edit.source.id);
+        if (
+            this.isFixed(edit.source.id) ||
+            current === undefined ||
+            current.type !== edit.source.type ||
+            current.construction !== edit.source.construction ||
+            current.params.length !== edit.source.params.length ||
+            current.params.some((value, i) => value !== edit.source.params[i])
+        ) {
+            return Result.err("The edited geometry has changed; select it again");
+        }
+        if (!editableCurve(current) || !edit.pieces.every(editableCurve)) {
+            return Result.err("The edit contains invalid geometry");
+        }
+        const saved = this.toData().constraints.filter((c) => c.refs.some((r) => r.entityId === current.id));
+        const removedConstraints = edit.copy ? [] : this.removeEntity(current.id);
+        const entityIds = edit.pieces.map((e) => {
+            const p = e.params;
+            const id =
+                e.type === "line"
+                    ? this.addLine(p[0], p[1], p[2], p[3])
+                    : e.type === "circle"
+                      ? this.addCircle(p[0], p[1], p[2])
+                      : this.addArc(p[0], p[1], p[2], p[3], p[4], p[5]);
+            this.setConstruction(id, e.construction === true);
+            return id;
+        });
+        if (edit.copy) return Result.ok({ entityIds, removedConstraints });
+        const points = new Map<number, SketchPointRef>();
+        const oldCount = current.type === "line" ? 2 : current.type === "arc" ? 3 : 1;
+        for (let i = 0; i < oldCount; i++) {
+            for (const id of entityIds) {
+                const entity = this.entity(id)!;
+                const count = entity.type === "line" ? 2 : entity.type === "arc" ? 3 : 1;
+                for (let j = 0; j < count; j++) {
+                    if (
+                        Math.hypot(
+                            current.params[2 * i] - entity.params[2 * j],
+                            current.params[2 * i + 1] - entity.params[2 * j + 1],
+                        ) < INCIDENCE_TOLERANCE
+                    ) {
+                        if (!points.has(i)) points.set(i, { entityId: id, pointIndex: j });
+                    }
+                }
+            }
+        }
+        const pointKinds = new Set([
+            ConstraintKind.Fix,
+            ConstraintKind.P2PCoincident,
+            ConstraintKind.HorizontalAlign,
+            ConstraintKind.VerticalAlign,
+            ConstraintKind.P2PDistance,
+            ConstraintKind.HorizontalDistance,
+            ConstraintKind.VerticalDistance,
+        ]);
+        for (const constraint of saved) {
+            if (
+                (constraint.kind === ConstraintKind.Horizontal ||
+                    constraint.kind === ConstraintKind.Vertical) &&
+                current.type === "line" &&
+                constraint.refs.every((r) => r.entityId === current.id)
+            ) {
+                for (const id of entityIds)
+                    this.addConstraint({
+                        kind: constraint.kind,
+                        refs: [
+                            { entityId: id, pointIndex: 0 },
+                            { entityId: id, pointIndex: 1 },
+                        ],
+                    });
+            } else if (constraint.kind === ConstraintKind.Radius && current.type !== "line") {
+                for (const id of entityIds)
+                    this.addConstraint({ ...constraint, refs: [{ entityId: id, pointIndex: 0 }] });
+            } else if (pointKinds.has(constraint.kind)) {
+                const refs = constraint.refs.map((r) =>
+                    r.entityId === current.id ? points.get(r.pointIndex) : r,
+                );
+                if (refs.every((r) => r !== undefined)) this.addConstraint({ ...constraint, refs });
+            }
+        }
+        return Result.ok({ entityIds, removedConstraints });
     }
 
     /** Removes the entity and every constraint referencing it; returns removed constraint ids. */

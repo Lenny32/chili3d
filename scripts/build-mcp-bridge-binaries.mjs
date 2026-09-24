@@ -21,7 +21,7 @@
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -95,7 +95,7 @@ for (const name of targets) {
     const file = `chili3d-mcp-bridge-${name}${target.ext}`;
     const output = path.join(outDir, file);
     const macos = name.startsWith("macos");
-    copyFileSync(await nodeBinary(target), output);
+    writeFileSync(output, await nodeBinary(target));
     chmodSync(output, 0o755);
     if (macos && process.platform === "darwin") execFileSync("codesign", ["--remove-signature", output]);
     await inject(output, "NODE_SEA_BLOB", blobData, {
@@ -114,42 +114,49 @@ rmSync(workDir, { recursive: true, force: true });
 writeFileSync(path.join(outDir, "SHA256SUMS"), `${sums.join("\n")}\n`);
 console.log(`built ${targets.length} bridge executable(s) into dist-bridge/ (Node ${process.version})`);
 
-/** The official `node` binary for a target, downloaded once, verified, and cached. */
+/**
+ * The official `node` binary for a target, as bytes. The archive is cached between builds, but
+ * checked against nodejs.org's SHASUMS256.txt every time it is used, cached or fresh.
+ */
 async function nodeBinary(target) {
     const archiveName =
         target.archive === "node.exe"
             ? `${target.dist}/node.exe`
             : `node-${process.version}-${target.dist}.${target.archive}`;
+    const expected = shasums
+        .split("\n")
+        .find((l) => l.endsWith(`  ${archiveName}`))
+        ?.split(" ")[0];
+    if (!expected) throw new Error(`${archiveName} is not listed in SHASUMS256.txt`);
+
     const cached = path.join(cacheDir, archiveName.replaceAll("/", "-"));
-    if (!existsSync(cached)) {
-        const data = Buffer.from(
+    let archive = readIfPresent(cached);
+    if (!archive || sha256(archive) !== expected) {
+        archive = Buffer.from(
             await (await fetchOk(`https://nodejs.org/dist/${process.version}/${archiveName}`)).arrayBuffer(),
         );
-        const expected = shasums
-            .split("\n")
-            .find((l) => l.endsWith(`  ${archiveName}`))
-            ?.split(" ")[0];
-        if (!expected || expected !== sha256(data)) {
+        if (sha256(archive) !== expected) {
             throw new Error(`checksum mismatch for ${archiveName}: refusing to build with it`);
         }
-        writeFileSync(cached, data);
+        writeFileSync(cached, archive);
     }
-    if (target.archive === "node.exe") return cached;
+    if (target.archive === "node.exe") return archive;
 
-    const extracted = path.join(cacheDir, `node-${process.version}-${target.dist}`, "bin/node");
-    if (!existsSync(extracted)) {
-        // tar ships with Linux, macOS and Windows 10+; the archive's top folder is node-<v>-<dist>.
-        // Relative paths from the cache folder: GNU tar reads "D:\…" as a remote host.
-        execFileSync(
-            "tar",
-            ["-xzf", path.basename(cached), `node-${process.version}-${target.dist}/bin/node`],
-            {
-                cwd: cacheDir,
-                stdio: "inherit",
-            },
-        );
+    // Extracted afresh on every build, so the binary always comes from the archive just verified.
+    // tar ships with Linux, macOS and Windows 10+; the archive's top folder is node-<v>-<dist>.
+    // Relative paths from the cache folder: GNU tar reads "D:\…" as a remote host.
+    const member = `node-${process.version}-${target.dist}/bin/node`;
+    execFileSync("tar", ["-xzf", path.basename(cached), member], { cwd: cacheDir, stdio: "inherit" });
+    return readFileSync(path.join(cacheDir, member));
+}
+
+function readIfPresent(file) {
+    try {
+        return readFileSync(file);
+    } catch (err) {
+        if (err.code === "ENOENT") return undefined;
+        throw err;
     }
-    return extracted;
 }
 
 async function fetchOk(url) {

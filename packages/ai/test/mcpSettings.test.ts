@@ -15,10 +15,23 @@ import {
     type McpSettings,
     mcpJsonConfig,
     saveMcpSettings,
+    shellArg,
     splitCommand,
 } from "../src/mcp/settings";
 
 const APP = "https://cad.example.com/";
+
+/** Runs `fn` as if the browser (and so the agent's terminal) were on Windows. */
+function asWindows<T>(fn: () => T): T {
+    const spy = rs
+        .spyOn(navigator, "userAgent", "get")
+        .mockReturnValue("Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+    try {
+        return fn();
+    } finally {
+        spy.mockRestore();
+    }
+}
 
 function settings(patch: Partial<McpSettings> = {}): McpSettings {
     return {
@@ -77,6 +90,23 @@ describe("mcp settings", () => {
         expect(bridgeEnv(settings({ requireToken: false }))).toEqual({});
     });
 
+    test.each([
+        ["plain-arg_1.0", "plain-arg_1.0"],
+        ["/Users/me/My Tools/bridge", "'/Users/me/My Tools/bridge'"],
+        ["$HOME/`x`", "'$HOME/`x`'"],
+        ["it's", `'it'"'"'s'`],
+    ])("quotes %s for POSIX shells as %s", (value, quoted) => {
+        expect(shellArg(value, false)).toBe(quoted);
+    });
+
+    test.each([
+        ["C:\\My Tools\\bridge.exe", '"C:\\My Tools\\bridge.exe"'],
+        ["C:\\My Tools\\", '"C:\\My Tools\\\\"'],
+        ['say "hi"', '"say ""hi"""'],
+    ])("quotes %s for Windows as %s", (value, quoted) => {
+        expect(shellArg(value, true)).toBe(quoted);
+    });
+
     test("splits a command line, keeping quoted parts together", () => {
         expect(splitCommand('node "C:\\My Tools\\cli.mjs" --x')).toEqual([
             "node",
@@ -89,7 +119,8 @@ describe("mcp settings", () => {
         expect(claudeCodeCommand(settings(), APP)).toBe(
             "claude mcp add chili3d -e CHILI3D_BRIDGE_TOKEN=abc123 -- npx -y @chili3d/mcp-bridge --app-url https://cad.example.com/",
         );
-        expect(claudeCodeCommand(settings({ bridgeCommand: 'node "C:\\My Tools\\cli.mjs"' }), APP)).toContain(
+        const local = settings({ bridgeCommand: 'node "C:\\My Tools\\cli.mjs"' });
+        expect(asWindows(() => claudeCodeCommand(local, APP))).toContain(
             '-- node "C:\\My Tools\\cli.mjs" --app-url',
         );
     });
@@ -174,7 +205,7 @@ describe("mcp settings", () => {
             args: ["--app-url", APP],
             env: { CHILI3D_BRIDGE_TOKEN: "abc123" },
         });
-        expect(claudeCodeCommand(exe, APP)).toBe(
+        expect(asWindows(() => claudeCodeCommand(exe, APP))).toBe(
             'claude mcp add chili3d -e CHILI3D_BRIDGE_TOKEN=abc123 -- "C:\\My Tools\\chili3d-mcp-bridge-windows-x64.exe" --app-url https://cad.example.com/',
         );
     });

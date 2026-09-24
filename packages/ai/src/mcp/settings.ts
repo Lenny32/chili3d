@@ -189,10 +189,18 @@ export function splitCommand(command: string): string[] {
     return [...command.matchAll(/"([^"]*)"|(\S+)/g)].map((m) => m[1] ?? m[2]);
 }
 
-/** Quote a shell argument when it needs it (spaces, shell metacharacters). */
-function shellArg(value: string): string {
-    // Backslashes stay as they are: they are Windows path separators far more often than escapes.
-    return /^[\w@%+=:,./\\-]+$/.test(value) ? value : `"${value.replace(/"/g, '\\"')}"`;
+/**
+ * Quote an argument for the terminal the user pastes the command into, when it needs quoting.
+ *
+ * POSIX shells get single quotes, inside which nothing is special; an embedded `'` closes the
+ * quote, adds a double-quoted `'`, and reopens. Windows (PowerShell or cmd) gets double quotes,
+ * with an embedded `"` doubled; backslashes before the closing quote are doubled too, because the
+ * Windows argument parser reads `\"` as an escaped quote (a trailing `\` would eat the quote).
+ */
+export function shellArg(value: string, windows = isWindowsClient()): string {
+    if (/^[\w@%+=:,./\\-]+$/.test(value)) return value;
+    if (!windows) return `'${value.replaceAll("'", `'"'"'`)}'`;
+    return `"${value.replaceAll('"', '""').replace(/(\\+)$/, "$1$1")}"`;
 }
 
 export function resolveBridgeCommand(
@@ -218,7 +226,7 @@ export function claudeCodeCommand(settings: McpSettings, appUrl: string): string
         ...splitCommand(resolveBridgeCommand(settings, appUrl)),
         ...bridgeArgs(settings, appUrl),
     ];
-    return ["claude mcp add chili3d", ...env, "--", ...command.map(shellArg)].join(" ");
+    return ["claude mcp add chili3d", ...env, "--", ...command.map((arg) => shellArg(arg))].join(" ");
 }
 
 export function mcpJsonConfig(settings: McpSettings, appUrl: string): string {

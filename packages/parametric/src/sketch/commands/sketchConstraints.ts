@@ -173,7 +173,7 @@ export class EqualConstraintCommand extends SketchConstraintCommand {
         }
         const t1 = editor.solver.entity(e1)?.type;
         const t2 = editor.solver.entity(e2)?.type;
-        if (t1 === undefined || t1 !== t2) {
+        if (t1 === undefined || t1 !== t2 || (t1 !== "line" && t1 !== "circle" && t1 !== "arc")) {
             PubSub.default.pub("displayError", "Equal requires two entities of the same type");
             return;
         }
@@ -211,7 +211,7 @@ export class TangentConstraintCommand extends SketchConstraintCommand {
         const t2 = editor.solver.entity(e2)?.type;
         const tangent = tangentConstraintFor(t1, e1, t2, e2);
         if (tangent === undefined) {
-            PubSub.default.pub("displayError", "Tangent does not apply to two lines");
+            PubSub.default.pub("displayError", "Tangent does not apply to this pair of entities");
             return;
         }
         addAndCommit(editor, tangent.kind, tangent.refs);

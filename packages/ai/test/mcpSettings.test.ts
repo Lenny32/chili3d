@@ -103,6 +103,7 @@ describe("mcp settings", () => {
         ["C:\\My Tools\\bridge.exe", '"C:\\My Tools\\bridge.exe"'],
         ["C:\\My Tools\\", '"C:\\My Tools\\\\"'],
         ['say "hi"', '"say ""hi"""'],
+        ['a\\"b c', '"a\\\\""b c"'],
     ])("quotes %s for Windows as %s", (value, quoted) => {
         expect(shellArg(value, true)).toBe(quoted);
     });

@@ -194,13 +194,18 @@ export function splitCommand(command: string): string[] {
  *
  * POSIX shells get single quotes, inside which nothing is special; an embedded `'` closes the
  * quote, adds a double-quoted `'`, and reopens. Windows (PowerShell or cmd) gets double quotes,
- * with an embedded `"` doubled; backslashes before the closing quote are doubled too, because the
- * Windows argument parser reads `\"` as an escaped quote (a trailing `\` would eat the quote).
+ * with an embedded `"` doubled. Backslashes are literal there, except a run of them that ends at a
+ * quote: the Windows argument parser halves it (reading `\"` as an escaped quote), so such a run,
+ * before an embedded quote or before the closing one, is doubled.
  */
 export function shellArg(value: string, windows = isWindowsClient()): string {
     if (/^[\w@%+=:,./\\-]+$/.test(value)) return value;
     if (!windows) return `'${value.replaceAll("'", `'"'"'`)}'`;
-    return `"${value.replaceAll('"', '""').replace(/(\\+)$/, "$1$1")}"`;
+    const escaped = value.replace(
+        /(\\*)("|$)/g,
+        (_, slashes: string, quote: string) => slashes + slashes + quote + quote,
+    );
+    return `"${escaped}"`;
 }
 
 export function resolveBridgeCommand(

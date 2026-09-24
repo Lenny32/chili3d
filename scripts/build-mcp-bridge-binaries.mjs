@@ -41,7 +41,6 @@ const SEA_FUSE = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(rootDir, "dist-bridge");
 const workDir = path.join(outDir, ".build");
-const cacheDir = path.join(rootDir, "node_modules/.cache/chili3d-sea", process.version);
 
 const requested = process.argv.slice(2);
 const unknown = requested.filter((t) => !(t in TARGETS));
@@ -53,7 +52,6 @@ const targets = requested.length > 0 ? requested : Object.keys(TARGETS);
 
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(workDir, { recursive: true });
-mkdirSync(cacheDir, { recursive: true });
 
 // 1. One CommonJS file. bufferutil / utf-8-validate are optional `ws` speed-ups it loads inside a
 //    try/catch; leaving them out keeps ws on its pure-JS path.
@@ -115,8 +113,8 @@ writeFileSync(path.join(outDir, "SHA256SUMS"), `${sums.join("\n")}\n`);
 console.log(`built ${targets.length} bridge executable(s) into dist-bridge/ (Node ${process.version})`);
 
 /**
- * The official `node` binary for a target, as bytes. The archive is cached between builds, but
- * checked against nodejs.org's SHASUMS256.txt every time it is used, cached or fresh.
+ * The official `node` binary for a target, as bytes: downloaded, checked against nodejs.org's
+ * SHASUMS256.txt, and extracted in memory, so nothing unverified ever touches the disk.
  */
 async function nodeBinary(target) {
     const archiveName =
@@ -129,34 +127,17 @@ async function nodeBinary(target) {
         ?.split(" ")[0];
     if (!expected) throw new Error(`${archiveName} is not listed in SHASUMS256.txt`);
 
-    const cached = path.join(cacheDir, archiveName.replaceAll("/", "-"));
-    let archive = readIfPresent(cached);
-    if (!archive || sha256(archive) !== expected) {
-        archive = Buffer.from(
-            await (await fetchOk(`https://nodejs.org/dist/${process.version}/${archiveName}`)).arrayBuffer(),
-        );
-        if (sha256(archive) !== expected) {
-            throw new Error(`checksum mismatch for ${archiveName}: refusing to build with it`);
-        }
-        writeFileSync(cached, archive);
+    const response = await fetchOk(`https://nodejs.org/dist/${process.version}/${archiveName}`);
+    const archive = Buffer.from(await response.arrayBuffer());
+    if (sha256(archive) !== expected) {
+        throw new Error(`checksum mismatch for ${archiveName}: refusing to build with it`);
     }
     if (target.archive === "node.exe") return archive;
 
-    // Extracted afresh on every build, so the binary always comes from the archive just verified.
     // tar ships with Linux, macOS and Windows 10+; the archive's top folder is node-<v>-<dist>.
-    // Relative paths from the cache folder: GNU tar reads "D:\…" as a remote host.
+    // It reads the archive from stdin and writes the one member to stdout.
     const member = `node-${process.version}-${target.dist}/bin/node`;
-    execFileSync("tar", ["-xzf", path.basename(cached), member], { cwd: cacheDir, stdio: "inherit" });
-    return readFileSync(path.join(cacheDir, member));
-}
-
-function readIfPresent(file) {
-    try {
-        return readFileSync(file);
-    } catch (err) {
-        if (err.code === "ENOENT") return undefined;
-        throw err;
-    }
+    return execFileSync("tar", ["-xzOf", "-", member], { input: archive, maxBuffer: 512 * 1024 * 1024 });
 }
 
 async function fetchOk(url) {

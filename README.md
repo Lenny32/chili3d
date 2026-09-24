@@ -33,7 +33,7 @@ Most of this comes from upstream.
 - STEP, IGES, BREP and STL import/export
 - Undo/redo, documents stored in IndexedDB
 - Plugins loaded at runtime with `?plugin=<url>` (examples in `plugins/`: hello world in JS and TS, macros, a node-based visual programming editor)
-- UI in English, Chinese, Brazilian Portuguese and Russian
+- UI in English
 
 ## Getting started
 

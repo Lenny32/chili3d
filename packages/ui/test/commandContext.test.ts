@@ -158,8 +158,8 @@ describe("CommandContext", () => {
         CommandStore.registerCommand(CancelableTestCommand, { key: CANCEL_CMD_KEY, icon: "icon-ctx" });
         CommandStore.registerCommand(MaterialCommand, { key: MATERIAL_CMD_KEY, icon: "icon-ctx" });
         CommandStore.registerCommand(LengthCommand, { key: LENGTH_CMD_KEY, icon: "icon-ctx" });
-        // I18n.isI18nKey (used by the combobox editor) reads the zh-CN translation table
-        I18n.addLanguage({ display: "zh", language: "zh-CN", translation: {} as Locale["translation"] });
+        // I18n.isI18nKey (used by the combobox editor) reads the en translation table
+        I18n.addLanguage({ display: "English", language: "en", translation: {} as Locale["translation"] });
     });
 
     afterEach(() => {
@@ -171,7 +171,7 @@ describe("CommandContext", () => {
         CommandStore.unregisterCommand(CANCEL_CMD_KEY);
         CommandStore.unregisterCommand(MATERIAL_CMD_KEY);
         CommandStore.unregisterCommand(LENGTH_CMD_KEY);
-        I18n.removeLanguage("zh-CN");
+        I18n.removeLanguage("en");
     });
 
     function track(ctx: CommandContext): CommandContext {

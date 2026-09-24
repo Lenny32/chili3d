@@ -36,14 +36,6 @@ const DemoPlugin: Plugin = {
                 "demo.hello.message": "Hello, This is a demo plugin!",
             },
         } as any,
-        {
-            language: "zh-CN",
-            display: "简体中文",
-            translation: {
-                "command.demo.hello": "TS 插件",
-                "demo.hello.message": "你好，这是一个演示插件！",
-            },
-        } as any,
     ],
 };
 

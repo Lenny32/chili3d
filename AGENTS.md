@@ -33,7 +33,7 @@ web ──> builder ──> app ──> core
 - **`ui`** — App chrome: main window, ribbon, property panels, project tree, dialogs, toast, status bar
 - **`app`** — `Application`, body nodes (`bodys/`), command implementations, `CommandService`, `HotkeyService`
 - **`builder`** — `AppBuilder` fluent chain (`.useIndexedDB().useWasmOcc().useParametric().useThree().useUI().build()`), default ribbon layout; `mergeRibbonProfiles` merges module contributions (`SketchRibbonProfiles` from `@chili3d/parametric`, `ParametricRibbonProfiles`) into `DefaultRibbon`
-- **`i18n`** / **`storage`** / **`web`** — Locale data (en, zh-cn, pt-br) / IndexedDB persistence / entry point (loading screen, `?plugin=`/`?url=`/`?model=`/`?mcp=` params)
+- **`i18n`** / **`storage`** / **`web`** — Locale data (en) / IndexedDB persistence / entry point (loading screen, `?plugin=`/`?url=`/`?model=`/`?mcp=` params)
 
 Import via workspace names (`import { ... } from "@chili3d/core"`); one root `tsconfig.json` covers all packages.
 

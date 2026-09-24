@@ -6,7 +6,7 @@ A demonstration plugin for Chili3D showing the capabilities of the plugin system
 
 - **Hello World Command**: A simple command that displays a greeting message
 - **Ribbon Integration**: Adds a button to the Tools tab
-- **i18n Support**: Supports English and Chinese (Simplified)
+- **i18n Support**: English
 
 ## Project Structure
 

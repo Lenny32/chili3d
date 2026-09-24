@@ -3,9 +3,7 @@
 
 import type { CommandKeys, Plugin, RibbonGroupKeys, RibbonTabKeys } from "@chili3d/core";
 import { OpenVisualProgrammingEditorCommand } from "./command";
-import { cn } from "./i18n/cn";
 import { en } from "./i18n/en";
-import { ru } from "./i18n/ru";
 
 const VisualProgrammingPlugin: Plugin = {
     commands: [OpenVisualProgrammingEditorCommand],
@@ -20,7 +18,7 @@ const VisualProgrammingPlugin: Plugin = {
             ],
         },
     ],
-    i18nResources: [en, ru, cn],
+    i18nResources: [en],
 };
 
 export default VisualProgrammingPlugin;

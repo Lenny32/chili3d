@@ -8,6 +8,7 @@ import {
     type EdgeMeshData,
     type IDisposable,
     type IView,
+    type ShapeMeshData,
 } from "@chili3d/core";
 import {
     arcAngles,
@@ -195,6 +196,7 @@ export class SketchAnnotationManager implements IDisposable {
         moved: boolean;
     };
     private dragCleanup?: () => void;
+    private geometryPreviewId?: number;
     private readonly onCameraChanged = debounce(() => this.refresh(), 20);
 
     // ------------------------------------------------------------------ Selection and refresh
@@ -653,6 +655,7 @@ export class SketchAnnotationManager implements IDisposable {
 
     dispose(): void {
         if (this.disposed) return;
+        this.setGeometryPreview([]);
         this.disposed = true;
         this.dragCleanup?.();
         this.view.cameraController.removePropertyChanged?.(this.onCameraChanged);
@@ -675,6 +678,22 @@ export class SketchAnnotationManager implements IDisposable {
         if (this.disposed) return;
         this.dimensionPreview = preview;
         this.refresh();
+    }
+
+    /** Geometry proposals never touch solver state and are removed on cancellation/exit. */
+    get hasGeometryPreview(): boolean {
+        return this.geometryPreviewId !== undefined;
+    }
+
+    setGeometryPreview(meshes: ShapeMeshData[]): void {
+        if (this.disposed || this.view.isClosed) return;
+        if (this.geometryPreviewId !== undefined) {
+            this.view.document.visual.context.removeMesh(this.geometryPreviewId);
+        }
+        this.geometryPreviewId = meshes.length
+            ? this.view.document.visual.context.displayMesh(meshes, { onTop: true })
+            : undefined;
+        this.view.update();
     }
 
     private isConstraintVisible(

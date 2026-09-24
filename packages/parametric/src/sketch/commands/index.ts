@@ -12,3 +12,7 @@ import "./sketchDimensions";
 import "./sketchLine";
 import "./sketchProjectEdges";
 import "./sketchRectangle";
+import "./sketchTrim";
+import "./sketchExtend";
+import "./sketchSplit";
+import "./sketchOffset";

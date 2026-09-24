@@ -18,6 +18,7 @@ import {
     type XYZ,
 } from "@chili3d/core";
 import type { ParametricBodyNode } from "../../parametricBodyNode";
+import type { GeometryEdit } from "../geometryEditing";
 import {
     ConstraintKind,
     datumUnitSpec,
@@ -527,6 +528,28 @@ export class SketchEditor implements IDisposable {
     }
 
     // ------------------------------------------------------------------ Solving, commit and deletion
+
+    applyGeometryEdit(edit: GeometryEdit): boolean {
+        if (this.disposed) return false;
+        const before = this.solver.toData();
+        const result = this.solver.applyGeometryEdit(edit);
+        if (!result.isOk) {
+            PubSub.default.pub("displayError", result.error);
+            return false;
+        }
+        const outcome = this.solve(true);
+        if (!outcome.result.startsWith("Ok")) {
+            this.solver.reset(before);
+            this.annotations.refresh();
+            PubSub.default.pub("displayError", "The edit conflicts with existing constraints");
+            return false;
+        }
+        for (const id of result.value.removedConstraints) this.dimensionAnchors.delete(id);
+        this.annotations.deselectConstraints(result.value.removedConstraints);
+        this.annotations.setHighlightedEntities([]);
+        this.commit();
+        return true;
+    }
 
     solve(fine: boolean): SolveOutcome {
         const outcome = this.solver.solve(fine);

@@ -1,0 +1,39 @@
+{
+    "name": "@chili3d/mcp-bridge",
+    "version": "0.7.1",
+    "description": "MCP stdio server that lets Claude Code, Claude Desktop, Cursor and other MCP clients drive Chili3D in your browser",
+    "keywords": [
+        "mcp",
+        "model-context-protocol",
+        "cad",
+        "chili3d"
+    ],
+    "license": "AGPL-3.0",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/lenny32/chili3d.git",
+        "directory": "packages/mcp-bridge"
+    },
+    "type": "module",
+    "main": "src/bridge.mjs",
+    "bin": {
+        "chili3d-mcp-bridge": "src/cli.mjs"
+    },
+    "files": [
+        "src/*.mjs",
+        "README.md"
+    ],
+    "engines": {
+        "node": ">=20.10"
+    },
+    "publishConfig": {
+        "access": "public"
+    },
+    "dependencies": {
+        "ws": "^8.21.0"
+    },
+    "devDependencies": {
+        "esbuild": "^0.28.2",
+        "postject": "^1.0.0-alpha.6"
+    }
+}

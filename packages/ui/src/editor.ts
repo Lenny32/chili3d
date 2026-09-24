@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ChatPanel, createChatPanel } from "@chili3d/ai";
+import { createMcpPanel, type McpPanel } from "@chili3d/ai";
 import {
     type IApplication,
     type ICommand,
@@ -28,7 +28,7 @@ export class Editor extends HTMLElement {
     private _contentEl: HTMLDivElement | null = null;
     private commandContext?: CommandContext;
     private chatDock?: HTMLElement;
-    private chatPanel?: ChatPanel;
+    private chatPanel?: McpPanel;
     private floatingChat?: FloatPanel;
     private _sidebarWidth: number = 360;
     private _chatWidth: number = 320;
@@ -72,9 +72,9 @@ export class Editor extends HTMLElement {
         this.app.mainWindow?.appendChild(this);
     }
 
-    private ensureChatPanel(): ChatPanel {
+    private ensureChatPanel(): McpPanel {
         if (this.chatPanel) return this.chatPanel;
-        const chat = createChatPanel();
+        const chat = createMcpPanel();
         chat.onClose = () => this.hideChat();
         chat.onDock = () => this.dockChat();
         this.attachDragToDetach(chat.header);
@@ -153,7 +153,7 @@ export class Editor extends HTMLElement {
         chat.setFloating(true);
 
         this.floatingChat = new FloatPanel({
-            title: "ai.title",
+            title: "mcp.title",
             content: chat,
             actions: chat.floatingActions(),
             width: 380,

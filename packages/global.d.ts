@@ -44,3 +44,5 @@ declare namespace jest {
 declare var __APP_VERSION__: string;
 declare var __DOCUMENT_VERSION__: string;
 declare var __IS_PRODUCTION__: boolean;
+/** Folder URL (ending in "/") holding the chili3d-mcp-bridge-<platform> release executables. */
+declare var __MCP_BRIDGE_DOWNLOAD_URL__: string;

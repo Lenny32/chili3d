@@ -1,0 +1,292 @@
+.root {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    width: 100%;
+    background-color: var(--background-color);
+    color: var(--foreground-color);
+    font-size: 12px;
+    overflow: hidden;
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border-color);
+    flex: 0 0 auto;
+    cursor: move;
+    user-select: none;
+    touch-action: none;
+}
+
+.title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+}
+
+.titleIcon {
+    width: 16px;
+    height: 16px;
+}
+
+.headerButtons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.iconButton {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--foreground-muted-color);
+    cursor: pointer;
+}
+
+.iconButton:hover {
+    background: var(--hover-background-color);
+    color: var(--foreground-color);
+}
+
+.buttonIcon {
+    width: 14px;
+    height: 14px;
+}
+
+.body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 12px;
+}
+
+.statusCard {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--control-background-color);
+}
+
+.statusLine {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background-color: var(--foreground-muted-color);
+}
+
+.statusCard[data-status="connecting"] .dot {
+    background-color: #d9a400;
+}
+
+.statusCard[data-status="connected"] .dot {
+    background-color: #2e9d4f;
+}
+
+.statusCard[data-status="offline"] .dot {
+    background-color: #c94040;
+}
+
+.callList {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+.callList:empty {
+    display: none;
+}
+
+.call {
+    display: flex;
+    gap: 8px;
+    color: var(--foreground-muted-color);
+}
+
+.callName {
+    color: var(--foreground-color);
+}
+
+.callError .callName {
+    color: #c94040;
+}
+
+.intro {
+    line-height: 1.5;
+}
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sectionTitle {
+    font-weight: 600;
+    font-size: 12.5px;
+}
+
+.muted {
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.muted:empty {
+    display: none;
+}
+
+.warning {
+    font-size: 11px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    border: 1px solid #c94040;
+    border-radius: 8px;
+    background: color-mix(in srgb, #c94040 10%, transparent);
+}
+
+.row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.field {
+    background: var(--input-background-color);
+    color: var(--input-text-color);
+    border: 1px solid var(--input-border-color);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.row .field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.fieldLabel {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+}
+
+.checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.snippet {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.snippetHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--foreground-muted-color);
+    font-size: 11px;
+}
+
+.code {
+    font-family: monospace;
+    font-size: 11px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--input-background-color);
+    color: var(--input-text-color);
+    user-select: text;
+}
+
+.textButton {
+    flex: 0 0 auto;
+    background: none;
+    color: var(--foreground-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.textButton:hover {
+    background: var(--hover-background-color);
+}
+
+.primaryButton {
+    align-self: flex-start;
+    color: var(--input-text-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.primaryButton:hover {
+    background: var(--hover-background-color);
+}
+
+.downloads {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.download,
+.downloadPrimary {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 11px;
+    color: var(--foreground-color);
+    text-decoration: none;
+}
+
+.downloadPrimary {
+    font-weight: 600;
+    border-color: var(--foreground-muted-color);
+}
+
+.download:hover,
+.downloadPrimary:hover {
+    background: var(--hover-background-color);
+}

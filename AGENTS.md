@@ -33,7 +33,7 @@ web ──> builder ──> app ──> core
 - **`ui`** — App chrome: main window, ribbon, property panels, project tree, dialogs, toast, status bar
 - **`app`** — `Application`, body nodes (`bodys/`), command implementations, `CommandService`, `HotkeyService`
 - **`builder`** — `AppBuilder` fluent chain (`.useIndexedDB().useWasmOcc().useParametric().useThree().useUI().build()`), default ribbon layout; `mergeRibbonProfiles` merges module contributions (`SketchRibbonProfiles` from `@chili3d/parametric`, `ParametricRibbonProfiles`) into `DefaultRibbon`
-- **`i18n`** / **`storage`** / **`web`** — Locale data (en, zh-cn, pt-br) / IndexedDB persistence / entry point (loading screen, `?plugin=`/`?url=`/`?model=` params)
+- **`i18n`** / **`storage`** / **`web`** — Locale data (en, zh-cn, pt-br) / IndexedDB persistence / entry point (loading screen, `?plugin=`/`?url=`/`?model=`/`?mcp=` params)
 
 Import via workspace names (`import { ... } from "@chili3d/core"`); one root `tsconfig.json` covers all packages.
 
@@ -52,7 +52,7 @@ OCCT v8.0.0 → `chili-wasm.wasm` via Emscripten. `cpp/src/`: `factory.cpp` (sha
 - **Undo/redo** — `Transaction` records snapshots, `History` keeps the stack; commands create transactions automatically.
 - **Plugins** — Loaded from URLs or `?plugin=`; manager in `core/src/plugin/` + `app/src/pluginManager.ts`; examples in `plugins/`.
 - **Global singleton** — `getCurrentApplication()` (from `core`) instead of DI threading.
-- **MCP server** — a separate package (`chili3d-mcp`, moved out of this repo): its `live_*` tools drive the user's open browser tab, and headless tools (`run_cad_program`, `render_preview`, …) are a server-side scratchpad. Units: millimetres; angles: degrees.
+- **MCP server** — runs *in the browser page* (`packages/ai/src/mcp/`): an SDK `Server` over the same `buildTools()` registry as the old chat panel. The ribbon's MCP button opens `McpPanel` (setup steps, token, generated client config, Connect); `settings.ts`/`state.ts`/`panel.ts` must stay SDK-free, and the SDK half (`mcp/index.ts`) is loaded with a dynamic `import()` on Connect, on `?mcp=ws://127.0.0.1:<port>/…` or on auto-connect. `packages/mcp-bridge` is the stdio process the MCP client launches, with no checkout needed: a standalone executable per OS attached to each release by `.github/workflows/release-mcp-bridge.yml` (Node.js SEA built from one runner by `scripts/build-mcp-bridge-binaries.mjs`: esbuild bundle + postject into each platform's official Node binary; download base baked in at build time as `__MCP_BRIDGE_DOWNLOAD_URL__`, overridable with `CHILI3D_BRIDGE_DOWNLOAD_URL`), or `npx --package=<site>/mcp/chili3d-mcp-bridge-<version>.tgz` (the tarball `scripts/pack-mcp-bridge.mjs` puts in `public/mcp/` on dev/build); `--app-url` sets the one accepted page origin; it relays JSON-RPC to the page over WebSocket (Origin + optional token checked), exposes a `chili3d_connect` tool while no page is connected, and replays the `initialize` handshake to pages that connect later. Tool calls are serialized (`SerialQueue`) because `run_program` refs chain across calls. Units: millimetres; angles: degrees.
 
 ## Testing
 

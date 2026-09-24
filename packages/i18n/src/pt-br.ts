@@ -68,6 +68,52 @@ export default {
         "features.reselect": "Reselecionar",
         "features.suppress": "Suprimir",
         "features.unsuppress": "Remover supressão",
+        "mcp.appUrl": "Endereço desta página (a ponte só aceita páginas dele)",
+        "mcp.autoConnect": "Conectar automaticamente ao abrir o Chili3D",
+        "mcp.bridgeAt": "Ponte: {0}",
+        "mcp.bridgeCommand": "Comando (altere apenas para um fork ou build local)",
+        "mcp.bridgeHint":
+            "A ponte é um pequeno programa no seu computador que o agente inicia. Você nunca clona nem compila nada: escolha uma das duas formas de obtê-la.",
+        "mcp.claudeCode": "Claude Code: execute em um terminal",
+        "mcp.connect": "Conectar",
+        "mcp.connectHint":
+            "Reinicie o agente (ou recarregue os servidores MCP dele) e clique em Conectar acima. O agente vê as ferramentas do Chili3D assim que esta aba se conecta. Mantenha a aba aberta enquanto ele trabalha.",
+        "mcp.copied": "Copiado",
+        "mcp.copy": "Copiar",
+        "mcp.disconnect": "Desconectar",
+        "mcp.download": "Baixar:",
+        "mcp.executableHint":
+            "Guarde-o onde quiser, por exemplo na sua pasta pessoal. No macOS e no Linux, torne-o executável uma vez com chmod +x <arquivo>. No macOS, se for bloqueado como de um desenvolvedor não identificado, execute xattr -d com.apple.quarantine <arquivo>.",
+        "mcp.executableMissing":
+            "Informe no passo 2 onde você salvou o executável: os comandos abaixo ainda contêm um caminho de exemplo.",
+        "mcp.executablePath": "Caminho completo onde você salvou",
+        "mcp.generate": "Gerar",
+        "mcp.intro":
+            "Permita que um agente de IA no seu computador (Claude Code, Claude Desktop, Cursor…) modele nesta aba pelo Model Context Protocol. O agente inicia um pequeno programa de ponte; esta página se conecta a ele e executa as ferramentas, então seu documento nunca sai do navegador.",
+        "mcp.jsonConfig": "Claude Desktop, Cursor e outros clientes: adicione ao arquivo de configuração MCP",
+        "mcp.noTokenWarning":
+            "Inseguro: sem token, qualquer programa neste computador pode se conectar à porta da ponte e controlar esta aba (ler, alterar e exportar seu modelo). Sites continuam bloqueados pela verificação de origem. Use apenas em uma máquina confiável.",
+        "mcp.nodeHint":
+            "Requer Node.js 20 ou mais recente (nodejs.org). O npx baixa a ponte deste site na primeira vez que o agente a inicia.",
+        "mcp.offlineHint":
+            "Ponte inacessível. Verifique se o agente a iniciou e se a porta e o token correspondem às configurações abaixo. Tentando novamente…",
+        "mcp.port": "Porta",
+        "mcp.remoteHint":
+            "Esta página vem de outro servidor, então o navegador pode perguntar se ela pode acessar apps ou dispositivos da rede local: permita, ou a ponte ficará inacessível. Chrome, Edge e Firefox suportam isso; o Safari bloqueia.",
+        "mcp.requireToken": "Exigir token de pareamento (recomendado)",
+        "mcp.runner.executable": "Baixar o executável (nada mais a instalar)",
+        "mcp.runner.node": "Executar com Node.js (o npx a obtém deste site)",
+        "mcp.status.connected": "Conectado: um agente pode controlar esta aba",
+        "mcp.status.connecting": "Conectando…",
+        "mcp.status.idle": "Não conectado",
+        "mcp.status.offline": "Aguardando a ponte",
+        "mcp.step.bridge": "2. Ponte",
+        "mcp.step.connect": "4. Conectar",
+        "mcp.step.register": "3. Registre a ponte no seu agente",
+        "mcp.step.token": "1. Token de pareamento",
+        "mcp.title": "MCP",
+        "mcp.tokenHint":
+            "A ponte só aceita esta página se ela apresentar o mesmo token. Ele é gerado para você e salvo neste navegador; se gerar um novo, copie a configuração atualizada para o agente novamente.",
         "prompt.select.sketch": "Selecione um esboço",
         "ribbon.group.feature": "Recurso",
         "body.pyramid": "Pirâmide",
@@ -80,7 +126,7 @@ export default {
         "circle.center": "Centro",
         "circle.radius": "Raio",
         "command.act.alignCamera": "Alinhar Câmera",
-        "command.ai.toggleChat": "Assistente IA",
+        "command.ai.toggleChat": "MCP",
         "command.boolean.common": "Interseção",
         "command.boolean.cut": "Cortar",
         "command.boolean.join": "Mesclar",

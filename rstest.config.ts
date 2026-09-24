@@ -27,6 +27,9 @@ export default defineConfig({
                     // Mirror rspack.config.ts: load .wasm as an asset URL instead of a
                     // native webassembly module (which would instantiate at import time).
                     { test: /\.wasm$/, type: "asset" },
+                    // The PlaneGCS emscripten glue resolves its own files at runtime
+                    // (`new URL("./", import.meta.url)`); keep rspack from bundling that.
+                    { test: /planegcs[\\/]dist[\\/]planegcs_dist[\\/]planegcs\.js$/, parser: { url: false } },
                 ],
             },
         },

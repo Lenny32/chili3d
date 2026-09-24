@@ -162,13 +162,13 @@ async function runParametric(args: Record<string, unknown>): Promise<string> {
 
     const parametric = await loadParametric();
     // Only a sketch carrying constraints needs the solver; a plain sketch of fixed
-    // coordinates never touches garlic, so those programs pay nothing for it.
+    // coordinates never touches the solver, so those programs pay nothing for it.
     const needsSolver = ops.some(
         (op) =>
             Array.isArray((op as { constraints?: unknown }).constraints) &&
             (op as { constraints: unknown[] }).constraints.length > 0,
     );
-    if (needsSolver) await parametric.initGarlic();
+    if (needsSolver) await parametric.initPlaneGcs();
 
     let result: ProgramResult | undefined;
     // Synchronous by construction: the solver is initialized above, and a throw here

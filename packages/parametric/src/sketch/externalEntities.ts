@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { WasmSystem } from "../../lib/garlic";
 import { normalizeSnapshot } from "./entityLayout";
+import type { SolverSystem } from "./planegcs";
 import {
     ConstraintKind,
     type ExternalRefData,
@@ -18,7 +18,7 @@ import {
  * This was a cluster of methods inside `SketchSolver` — the largest single block in
  * that 1278-line class, and the one block with state of its own rather than the
  * solver's. It is a registry rather than a second solver: it owns *which* externals
- * exist and *where* they came from, and borrows the solver's entity tables and garlic
+ * exist and *where* they came from, and borrows the solver's entity tables and constraint
  * system to place them. `SketchSolver` keeps delegating, so nothing outside changed.
  *
  * The shape of an external entity:
@@ -36,23 +36,23 @@ import {
  * the point of the split is that the borrow is declared, and this is the declaration.
  */
 export interface ExternalEntityHost {
-    /** The garlic system params and constraints are created in. Replaced on `reset`. */
-    readonly system: WasmSystem;
+    /** The solver system params and constraints are created in. Replaced on `reset`. */
+    readonly system: SolverSystem;
     /**
-     * Creates garlic params in `type`'s entity layout AND registers them as an entity
+     * Creates solver params in `type`'s entity layout AND registers them as an entity
      * under `id` (allocating one when omitted). Returns the created param ids.
      */
     seedEntity(type: SketchEntityType, values: number[], id?: number): number[];
     /** The entity tables for `id`, with `cache` LIVE — mutations are seen by later reads. */
     entityTablesOf(id: number): EntityTables | undefined;
-    /** Drops `id` from the entity tables; its garlic params are the caller's business. */
+    /** Drops `id` from the entity tables; its solver params are the caller's business. */
     forgetEntity(id: number): void;
     setFixed(id: number, fixed: boolean): void;
     /** Removes every constraint referencing `entityId`, returning the removed ids. */
     removeConstraintsOn(entityId: number): number[];
     /** Pins `paramIds`, taken in (x, y) pairs, to a fresh datum per pair holding `values`. */
     pinPoints(paramIds: readonly number[], values: readonly number[]): ExternalPins;
-    /** A fresh garlic param holding `value`, for a structural datum to pin against. */
+    /** A fresh solver param holding `value`, for a structural datum to pin against. */
     createDatumParam(value: number): number;
     /** Records that an id was allocated since the last load — the serialization gate. */
     markIdAllocated(): void;
@@ -176,7 +176,7 @@ export class ExternalEntityRegistry {
     /**
      * Removes an external reference and every constraint referencing it; returns
      * the removed constraint ids. The structural pins, their datum params and the
-     * entity params are removed from garlic (constraints first — params in use
+     * entity params are removed from the solver (constraints first — params in use
      * cannot be removed).
      */
     removeExternalEntity(id: number): number[] {
@@ -341,7 +341,7 @@ export class ExternalEntityRegistry {
 
     /**
      * Seeds one external entity into the regular entity tables (marked fixed): raw
-     * garlic params in the entity layout, every point pinned by an internal Fix
+     * solver params in the entity layout, every point pinned by an internal Fix
      * constraint (circles additionally pin the radius with an internal Radius
      * constraint). Net dofs contribution is zero; the structural constraints stay
      * out of the solver's constraint table.

@@ -859,14 +859,14 @@ describe("SketchSolver", () => {
             };
 
             const id = solver.addConstraint({ kind: ConstraintKind.P2LDistance, refs });
-            // garlic's sign is the negated cross product: left of the direction stores negative
+            // the solver's sign is the negated cross product: left of the direction stores negative
             expect(solver.toData().constraints.find((c) => c.id === id)!.datum).toBeCloseTo(-6, 6);
 
             // accepting the default datum keeps the point above the line (no mirroring)
             solver.solve(true);
             expect(signedDistance()).toBeCloseTo(6, 6);
 
-            // a positive garlic datum pulls the point to the other side
+            // a positive solver datum pulls the point to the other side
             solver.setDatum(id, 6);
             solver.solve(true);
             expect(signedDistance()).toBeCloseTo(-6, 6);

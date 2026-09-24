@@ -14,8 +14,8 @@ import {
     type UnitSpec,
     type XYZ,
 } from "@chili3d/core";
-import { ConstraintKind } from "../../lib/garlic";
 import type { EdgeRef } from "../features/edgeRef";
+import { ConstraintKind } from "./planegcs";
 
 export { ConstraintKind };
 
@@ -76,7 +76,7 @@ export function datumUnitSpec(kind: ConstraintKind): UnitSpec {
 /**
  * Datum value shown in the UI: angles store the signed sweep (the sign picks the
  * side of the first line) and display its magnitude in degrees, point-line
- * distances flip sign (UI: positive = left of the line direction; garlic stores
+ * distances flip sign (UI: positive = left of the line direction; the solver stores
  * the negated signed distance), everything else as stored.
  */
 export function toDisplayDatum(kind: ConstraintKind, value: number): number {

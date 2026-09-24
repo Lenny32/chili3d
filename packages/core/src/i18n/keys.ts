@@ -195,7 +195,6 @@ export const I18N_KEYS = [
     "command.sketch.toggleExternal",
     "command.special.last",
     "command.test.performance",
-    "command.wechat.group",
     "command.workingPlane.alignToPlane",
     "command.workingPlane.fromSection",
     "command.workingPlane.set",

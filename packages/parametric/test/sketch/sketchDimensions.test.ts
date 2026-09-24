@@ -524,7 +524,7 @@ describe("dimension commands", () => {
                 { entityId: 1, pointIndex: 0 },
                 { entityId: 1, pointIndex: 1 },
             ]);
-            // the point is left of the line direction: display +30, garlic stores the negation
+            // the point is left of the line direction: display +30, the solver stores the negation
             expect(constraints[0].datum).toBeCloseTo(-30);
             expect(editor.dimensionAnchors.get(constraints[0].id)?.kind).toBe("offset");
 

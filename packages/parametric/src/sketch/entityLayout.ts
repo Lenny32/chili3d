@@ -4,7 +4,7 @@
 import type { SketchEntityType } from "./sketchModel";
 
 /**
- * The garlic parameter layout of a sketch entity type — how many params an entity
+ * The solver parameter layout of a sketch entity type — how many params an entity
  * carries, and what each one means.
  *
  * Its own module because two things need it that are not each other: `solver.ts`,
@@ -13,11 +13,11 @@ import type { SketchEntityType } from "./sketchModel";
  * a hand-edited or legacy snapshot from reaching either one short.
  */
 
-/** garlic param kind: an (x, y) coordinate pair, or a scalar length/radius. */
+/** solver param kind: an (x, y) coordinate pair, or a scalar length/radius. */
 export const PARAM_KIND_COORDINATE = 0;
 export const PARAM_KIND_LENGTH = 1;
 
-/** garlic param kinds per entity type: line = 2 points, circle = center + radius, arc = 3 points. */
+/** solver param kinds per entity type: line = 2 points, circle = center + radius, arc = 3 points. */
 export const ENTITY_PARAM_KINDS: Record<SketchEntityType, number[]> = {
     line: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE],
     circle: [PARAM_KIND_COORDINATE, PARAM_KIND_COORDINATE, PARAM_KIND_LENGTH],
@@ -34,7 +34,7 @@ export const ENTITY_PARAM_KINDS: Record<SketchEntityType, number[]> = {
 /**
  * Pads/truncates a snapshot to the entity type's param layout. Hand-edited or
  * legacy data can carry a truncated snapshot — normalizing beats throwing from a
- * property-listener path (updateExternalEntity's length guard), seeding garlic
+ * property-listener path (updateExternalEntity's length guard), seeding the solver
  * with a short param array, or feeding NaN coordinates to shape building. Unknown
  * types and already-matching lengths pass through unchanged (same array identity).
  */

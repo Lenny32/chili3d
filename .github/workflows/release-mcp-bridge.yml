@@ -1,0 +1,127 @@
+name: Release MCP bridge
+
+# Standalone chili3d-mcp-bridge executables for the release: users download one file and point
+# their MCP client at it, with no Node.js and no checkout. Runs on the version tags pushed by
+# scripts/release.mjs (plain "0.7.1", no "v"); re-run by hand to attach them to an existing tag.
+
+on:
+    push:
+        tags: ["[0-9]+.[0-9]+.[0-9]+"]
+    workflow_dispatch:
+        inputs:
+            tag:
+                description: "Existing release tag to attach the executables to (e.g. 0.7.1)"
+                required: true
+
+permissions:
+    contents: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ inputs.tag || github.ref_name }}
+
+env:
+    TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+    build:
+        # Node.js single executable applications: the bundled bridge is injected into each
+        # platform's official Node binary. macOS targets are built on macOS, where the script can
+        # strip Node's signature before the injection and ad-hoc sign the result.
+        name: Build ${{ matrix.name }}
+        strategy:
+            matrix:
+                include:
+                    - { name: windows-linux, os: ubuntu-latest, targets: windows-x64 linux-x64 linux-arm64 }
+                    - { name: macos, os: macos-latest, targets: macos-x64 macos-arm64 }
+        runs-on: ${{ matrix.os }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ env.TAG }}
+                  persist-credentials: false
+
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 24
+                  cache: npm
+
+            - run: npm ci
+
+            - run: node scripts/build-mcp-bridge-binaries.mjs ${{ matrix.targets }}
+
+            - name: npm package (for npx users)
+              if: matrix.name == 'windows-linux'
+              run: npm pack --pack-destination ../../dist-bridge
+              working-directory: packages/mcp-bridge
+
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: build-${{ matrix.name }}
+                  path: |
+                      dist-bridge/chili3d-mcp-bridge-*
+                  if-no-files-found: error
+
+    verify:
+        name: Verify on ${{ matrix.target }}
+        needs: build
+        strategy:
+            fail-fast: true
+            matrix:
+                include:
+                    - { target: windows-x64, os: windows-latest, file: chili3d-mcp-bridge-windows-x64.exe }
+                    - { target: linux-x64, os: ubuntu-latest, file: chili3d-mcp-bridge-linux-x64 }
+                    - { target: linux-arm64, os: ubuntu-24.04-arm, file: chili3d-mcp-bridge-linux-arm64 }
+                    - { target: macos-x64, os: macos-15-intel, file: chili3d-mcp-bridge-macos-x64 }
+                    - { target: macos-arm64, os: macos-latest, file: chili3d-mcp-bridge-macos-arm64 }
+        runs-on: ${{ matrix.os }}
+        defaults:
+            run:
+                shell: bash
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: build-*
+                  merge-multiple: true
+                  path: bin
+
+            # Ad-hoc signed by the build (enough to run; Gatekeeper still flags a download without
+            # a paid Developer ID, which the MCP panel explains). Fail here if it is not.
+            - name: Check signature (macOS)
+              if: startsWith(matrix.target, 'macos')
+              run: codesign --verify --verbose "bin/${{ matrix.file }}"
+
+            - name: Smoke test (version + MCP handshake)
+              run: |
+                  chmod +x "bin/${{ matrix.file }}"
+                  "bin/${{ matrix.file }}" --version
+                  init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}'
+                  reply=$( (echo "$init"; sleep 3) | "bin/${{ matrix.file }}" --app-url https://ci.example/ --port 7777 --token ci | head -n 1)
+                  echo "$reply"
+                  echo "$reply" | grep -q '"serverInfo":{"name":"chili3d"'
+
+    release:
+        name: Attach to release ${{ inputs.tag || github.ref_name }}
+        needs: verify
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+
+            # Everything was verified on its own OS by the job above.
+            - name: Collect files
+              run: |
+                  mkdir release
+                  cp artifacts/build-*/chili3d-mcp-bridge-* release/
+                  test "$(ls release | grep -vc '\.tgz$')" -eq 5
+                  cd release && sha256sum chili3d-mcp-bridge-* > SHA256SUMS && cat SHA256SUMS
+
+            - name: Upload
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+              run: |
+                  gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
+                  gh release upload "$TAG" release/* --clobber

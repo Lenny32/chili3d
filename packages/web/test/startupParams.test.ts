@@ -58,4 +58,10 @@ describe("parseStartupParams", () => {
     test("should ignore unrelated params", () => {
         expect(parseStartupParams("?foo=1&bar=2")).toEqual({ plugins: [], fileUrl: undefined });
     });
+
+    test("should decode the mcp bridge url", () => {
+        const bridge = "ws://127.0.0.1:7777/?token=abc";
+        const result = parseStartupParams(`?mcp=${encodeURIComponent(bridge)}`);
+        expect(result.mcpUrl).toBe(bridge);
+    });
 });

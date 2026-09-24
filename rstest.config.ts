@@ -4,6 +4,11 @@ import { defineConfig } from "@rstest/core";
 import packages from "./package.json" with { type: "json" };
 
 const configDir = import.meta.dirname;
+// Where the MCP panel links the standalone bridge executables. Forks and self-hosters that publish
+// their own releases set CHILI3D_BRIDGE_DOWNLOAD_URL (a folder URL ending in "/") at build time.
+const mcpBridgeDownloadUrl =
+    process.env["CHILI3D_BRIDGE_DOWNLOAD_URL"] ??
+    `https://github.com/lenny32/chili3d/releases/download/${packages.version}/`;
 
 export default defineConfig({
     exclude: ["**/cpp/**"],
@@ -20,6 +25,7 @@ export default defineConfig({
                     __APP_VERSION__: JSON.stringify(packages.version),
                     __DOCUMENT_VERSION__: JSON.stringify(packages.documentVersion),
                     __IS_PRODUCTION__: JSON.stringify(process.env.NODE_ENV === "production"),
+                    __MCP_BRIDGE_DOWNLOAD_URL__: JSON.stringify(mcpBridgeDownloadUrl),
                 }),
             ],
             module: {

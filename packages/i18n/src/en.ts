@@ -89,7 +89,7 @@ export default {
         "circle.center": "Center",
         "circle.radius": "Radius",
         "command.act.alignCamera": "Align Camera",
-        "command.ai.toggleChat": "AI Assistant",
+        "command.ai.toggleChat": "MCP",
         "command.boolean.common": "Intersect",
         "command.boolean.cut": "Cut",
         "command.boolean.join": "Join",
@@ -315,6 +315,52 @@ export default {
         "material.texture.rotation": "Rotation",
         "material.texture.wrapS": "Wrap S",
         "material.texture.wrapT": "Wrap T",
+        "mcp.appUrl": "This page's address (the bridge only accepts pages from it)",
+        "mcp.autoConnect": "Connect automatically when Chili3D opens",
+        "mcp.bridgeAt": "Bridge: {0}",
+        "mcp.bridgeCommand": "Command (change it only for a fork or a local build)",
+        "mcp.bridgeHint":
+            "The bridge is a small program on your computer that your agent starts. You never clone or build anything: pick one of the two ways to get it.",
+        "mcp.claudeCode": "Claude Code: run in a terminal",
+        "mcp.connect": "Connect",
+        "mcp.connectHint":
+            "Restart your agent (or reload its MCP servers), then press Connect above. The agent sees the Chili3D tools as soon as this tab is connected. Keep the tab open while it works.",
+        "mcp.copied": "Copied",
+        "mcp.copy": "Copy",
+        "mcp.disconnect": "Disconnect",
+        "mcp.download": "Download:",
+        "mcp.executableHint":
+            "Keep it anywhere, e.g. your home folder. On macOS and Linux, make it executable once with chmod +x <file>. On macOS, if it is blocked as coming from an unidentified developer, run xattr -d com.apple.quarantine <file>.",
+        "mcp.executableMissing":
+            "Enter where you saved the executable in step 2: the commands below still contain a placeholder path.",
+        "mcp.executablePath": "Full path where you saved it",
+        "mcp.generate": "Generate",
+        "mcp.intro":
+            "Let an AI agent on your computer (Claude Code, Claude Desktop, Cursor…) model in this tab through the Model Context Protocol. The agent starts a small bridge program; this page connects to it and runs the tools itself, so your document never leaves the browser.",
+        "mcp.jsonConfig": "Claude Desktop, Cursor and other clients: add to the MCP config file",
+        "mcp.noTokenWarning":
+            "Insecure: without a token, any program on this computer can connect to the bridge port and drive this tab (read your model, change it, export it). Websites are still blocked by the origin check. Use this only on a machine you trust.",
+        "mcp.nodeHint":
+            "Needs Node.js 20 or newer (nodejs.org). npx downloads the bridge from this site the first time the agent starts it.",
+        "mcp.offlineHint":
+            "Bridge not reachable. Check that your agent has started it and that its port and token match the settings below. Retrying…",
+        "mcp.port": "Port",
+        "mcp.remoteHint":
+            "This page is served from another machine, so your browser may ask whether it may access apps or devices on your local network: allow it, or the bridge stays unreachable. Chrome, Edge and Firefox support this; Safari blocks it.",
+        "mcp.requireToken": "Require a pairing token (recommended)",
+        "mcp.runner.executable": "Download the executable (nothing else to install)",
+        "mcp.runner.node": "Run it with Node.js (npx fetches it from this site)",
+        "mcp.status.connected": "Connected: an agent can drive this tab",
+        "mcp.status.connecting": "Connecting…",
+        "mcp.status.idle": "Not connected",
+        "mcp.status.offline": "Waiting for the bridge",
+        "mcp.step.bridge": "2. Bridge",
+        "mcp.step.connect": "4. Connect",
+        "mcp.step.register": "3. Register the bridge with your agent",
+        "mcp.step.token": "1. Pairing token",
+        "mcp.title": "MCP",
+        "mcp.tokenHint":
+            "The bridge only accepts this page if it presents the same token. It is generated for you and saved in this browser; if you generate a new one, copy the updated config into your agent again.",
         "model.visible": "Visible",
         "option.command.circularPattern": "Circular Pattern",
         "option.command.continuity": "Continuity",

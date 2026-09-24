@@ -22,7 +22,7 @@ export function setAskHandler(next: AskHandler | undefined): void {
     handler = next;
 }
 
-function parseRequest(raw: Record<string, unknown>): AskRequest {
+export function parseAskRequest(raw: Record<string, unknown>): AskRequest {
     const question = raw["question"];
     if (typeof question !== "string" || question.trim() === "") {
         throw new Error(`question must be a non-empty string, got ${JSON.stringify(question)}`);
@@ -62,7 +62,7 @@ export function buildAskUserTool(): Tool {
                     JSON.stringify({ error: "no chat panel is open to answer this question" }),
                 );
             }
-            return ask(parseRequest(args), signal);
+            return ask(parseAskRequest(args), signal);
         },
     };
 }

@@ -94,6 +94,13 @@ export const I18N_KEYS = [
     "command.constraint.coincident",
     "command.constraint.equal",
     "command.constraint.fix",
+    "command.constraint.collinear",
+    "command.constraint.block",
+    "command.constraint.construction",
+    "command.constraint.equalAngle",
+    "command.constraint.scale",
+    "command.sketch.autoConstrain",
+
     "command.constraint.horizontal",
     "command.constraint.horizontalAlign",
     "command.constraint.midpoint",

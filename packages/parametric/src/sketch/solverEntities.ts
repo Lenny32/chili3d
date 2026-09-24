@@ -29,6 +29,9 @@ export function constraintTargetEntities(solver: SketchSolver): SketchEntityData
  * at worst.
  */
 const ASSOCIATIVE_KINDS: readonly ConstraintKind[] = [
+    ConstraintKind.Collinear,
+    ConstraintKind.EqualAngle,
+    ConstraintKind.Scale,
     ConstraintKind.P2PCoincident,
     ConstraintKind.PointOnLine,
     ConstraintKind.PointOnCircle,

@@ -37,6 +37,7 @@ import * as datumPrompt from "./datumPrompt";
 import { type DimensionAnchor, toDisplayDatum, toStorageDatum } from "./dimensionLayout";
 import { SketchAnnotationManager } from "./sketchAnnotations";
 import { SketchEventHandler } from "./sketchEventHandler";
+import { SolverFeedback } from "./solverFeedback";
 
 /**
  * One sketch editing session, and the only thing that owns it.
@@ -94,6 +95,7 @@ type RollbackMap = ReturnType<typeof computeSketchRollback>;
 
 /** The live sketch session — see the module header for its lifecycle and ownership. */
 export class SketchEditor implements IDisposable {
+    private feedback?: SolverFeedback;
     readonly solver: SketchSolver;
     readonly annotations: SketchAnnotationManager;
     /** Label anchors (relative to the referenced geometry) for datum constraints. */
@@ -197,6 +199,10 @@ export class SketchEditor implements IDisposable {
             this.document.variables.onPropertyChanged(this.handleVariablesChanged);
             teardown.push(() => this.document.variables.removePropertyChanged(this.handleVariablesChanged));
 
+            if (this.view.dom) {
+                this.feedback = new SolverFeedback(this, this.view.dom);
+                teardown.push(() => this.feedback?.dispose());
+            }
             this.solve(true);
             PubSub.default.sub("activeViewChanged", this.onActiveViewChanged);
             teardown.push(() => PubSub.default.remove("activeViewChanged", this.onActiveViewChanged));
@@ -590,6 +596,7 @@ export class SketchEditor implements IDisposable {
         const outcome = this.solver.solve(fine);
         this.annotations.refresh();
         this.publishSolveStatus(outcome);
+        this.feedback?.update(outcome, fine);
         return outcome;
     }
 
@@ -716,7 +723,7 @@ export class SketchEditor implements IDisposable {
     /** Re-opens the datum dialog of an existing dimension constraint (double-click edit). */
     editDatum(constraintId: number): void {
         const constraint = this.solver.toData().constraints.find((x) => x.id === constraintId);
-        if (constraint === undefined) return;
+        if (constraint === undefined || constraint.kind === ConstraintKind.Block) return;
         const unit = datumUnitSpec(constraint.kind);
         if (constraint.datums !== undefined) {
             this.promptDatumPair(
@@ -779,7 +786,12 @@ export class SketchEditor implements IDisposable {
         }
     }
 
+    showDimensionReview(): void {
+        this.feedback?.showDimensionReview();
+    }
+
     dispose(): void {
+        this.feedback?.dispose();
         if (this.disposed) return;
         this.disposed = true;
         this.cancelPick();

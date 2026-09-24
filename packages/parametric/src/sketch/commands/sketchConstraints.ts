@@ -1,7 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { AsyncController, CancelableCommand, command, PubSub } from "@chili3d/core";
+import { AsyncController, CancelableCommand, command, PubSub, UNITLESS } from "@chili3d/core";
 import { SketchEditor } from "../editor/sketchEditor";
 import { ConstraintKind, pointRefKey, type SketchPointRef } from "../sketchModel";
 import type { SketchSolver } from "../solver";
@@ -287,5 +287,145 @@ export class FixConstraintCommand extends SketchConstraintCommand {
         const p = await editor.pickPoint("prompt.pickSketchPoint", undefined, this.controller);
         if (p === undefined || !allowsConstraintOnEntity(ConstraintKind.Fix, p.entityId)) return;
         addAndCommit(editor, ConstraintKind.Fix, [p], { datums: [...editor.solver.pointOf(p)] });
+    }
+}
+
+/** Selected lines/points share a baseline; with no selection, pick two lines. */
+@command({ key: "constraint.collinear", icon: "icon-cParallel" })
+export class CollinearConstraintCommand extends SketchConstraintCommand {
+    protected async executeWithEditor(editor: SketchEditor): Promise<void> {
+        let ids = editor.selectedEntityIds;
+        if (ids.length < 2) {
+            ids = [];
+            for (let i = 0; i < 2; i++) {
+                this.controller = new AsyncController();
+                const id = await editor.pickEntity(
+                    "prompt.pickSketchEntity",
+                    "line",
+                    undefined,
+                    this.controller,
+                );
+                if (id === undefined) return;
+                ids.push(id);
+            }
+        }
+        const refs = [...new Set(ids)].flatMap((id) => {
+            const type = editor.solver.entity(id)?.type;
+            return type === "line" ? lineRefs(id) : type === "point" ? [centerRef(id)] : [];
+        });
+        if (refs.length < 3) return;
+        const a = editor.solver.pointOf(refs[0]);
+        const second = refs.findIndex((r) => {
+            const b = editor.solver.pointOf(r);
+            return Math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-9;
+        });
+        if (second < 0) return;
+        [refs[1], refs[second]] = [refs[second], refs[1]];
+        addAndCommit(editor, ConstraintKind.Collinear, refs);
+    }
+}
+
+@command({ key: "constraint.block", icon: "icon-cFix" })
+export class BlockConstraintCommand extends SketchConstraintCommand {
+    protected async executeWithEditor(editor: SketchEditor): Promise<void> {
+        let ids = editor.selectedEntityIds;
+        if (ids.length === 0) {
+            this.controller = new AsyncController();
+            const id = await editor.pickEntity(
+                "prompt.pickSketchEntity",
+                undefined,
+                undefined,
+                this.controller,
+            );
+            if (id === undefined) return;
+            ids = [id];
+        }
+        for (const id of ids) {
+            if (id < 1 || editor.solver.hasConstraint(ConstraintKind.Block, [centerRef(id)])) continue;
+            editor.solver.addConstraint({ kind: ConstraintKind.Block, refs: [centerRef(id)] });
+        }
+        editor.solve(true);
+        editor.commit();
+    }
+}
+
+@command({ key: "constraint.construction", icon: "icon-cPointOn" })
+export class ConstructionConstraintCommand extends SketchConstraintCommand {
+    protected async executeWithEditor(editor: SketchEditor): Promise<void> {
+        let ids = editor.selectedEntityIds;
+        if (ids.length === 0) {
+            this.controller = new AsyncController();
+            const id = await editor.pickEntity(
+                "prompt.pickSketchEntity",
+                undefined,
+                undefined,
+                this.controller,
+            );
+            if (id === undefined) return;
+            ids = [id];
+        }
+        for (const id of ids) {
+            if (id > 0) editor.solver.setConstruction(id, !editor.solver.entity(id)?.construction);
+        }
+        editor.solve(true);
+        editor.commit();
+    }
+}
+
+/** Four lines in order define two directed angles, with no driving angle datum required. */
+@command({ key: "constraint.equalAngle", icon: "icon-cEqual" })
+export class EqualAngleConstraintCommand extends SketchConstraintCommand {
+    protected async executeWithEditor(editor: SketchEditor): Promise<void> {
+        const refs: SketchPointRef[] = [];
+        for (let i = 0; i < 4; i++) {
+            this.controller = new AsyncController();
+            const id = await editor.pickEntity("prompt.pickSketchEntity", "line", undefined, this.controller);
+            if (id === undefined) return;
+            if (i % 2 === 1 && refs[refs.length - 1].entityId === id) return;
+            refs.push(...lineRefs(id));
+        }
+        // Order defines the two angles; a sorted ref set is not a duplicate key here.
+        if (
+            editor.solver
+                .toData()
+                .constraints.some(
+                    (c) =>
+                        c.kind === ConstraintKind.EqualAngle &&
+                        c.refs.map(pointRefKey).join("|") === refs.map(pointRefKey).join("|"),
+                )
+        )
+            return;
+        editor.solver.addConstraint({ kind: ConstraintKind.EqualAngle, refs });
+        editor.solve(true);
+        editor.commit();
+    }
+}
+
+@command({ key: "constraint.scale", icon: "icon-cEqual" })
+export class ScaleConstraintCommand extends SketchConstraintCommand {
+    protected async executeWithEditor(editor: SketchEditor): Promise<void> {
+        const ids: number[] = [];
+        for (let i = 0; i < 2; i++) {
+            this.controller = new AsyncController();
+            const id = await editor.pickEntity("prompt.pickSketchEntity", "line", undefined, this.controller);
+            if (id === undefined || ids.includes(id)) return;
+            ids.push(id);
+        }
+        const length = (id: number) => {
+            const [a, b] = lineRefs(id).map((r) => editor.solver.pointOf(r));
+            return Math.hypot(b[0] - a[0], b[1] - a[1]);
+        };
+        if (ids.some((id) => length(id) < 1e-9)) return;
+        editor.promptDatum(
+            length(ids[0]) / length(ids[1]),
+            (datum) => {
+                editor.solver.addConstraint({
+                    kind: ConstraintKind.Scale,
+                    refs: ids.flatMap(lineRefs),
+                    datum,
+                });
+            },
+            UNITLESS,
+        );
     }
 }

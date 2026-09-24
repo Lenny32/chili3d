@@ -103,6 +103,13 @@ export default {
         "command.constraint.coincident": "Coincident",
         "command.constraint.equal": "Equal",
         "command.constraint.fix": "Fix Point",
+        "command.constraint.collinear": "Collinear",
+        "command.constraint.block": "Block Entities",
+        "command.constraint.construction": "Toggle Construction",
+        "command.constraint.equalAngle": "Equal Angles",
+        "command.constraint.scale": "Length Ratio",
+        "command.sketch.autoConstrain": "Auto-Dimension",
+
         "command.constraint.horizontal": "Horizontal",
         "command.constraint.horizontalAlign": "Align Horizontally",
         "command.constraint.midpoint": "Midpoint",

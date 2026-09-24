@@ -11,10 +11,11 @@ import {
     type ExternalPins,
 } from "./externalEntities";
 import { editableCurve, type GeometryEdit } from "./geometryEditing";
-import type { SolverSystem } from "./planegcs";
+import type { SolverDiagnosis, SolverSystem } from "./planegcs";
 import { newSolverSystem } from "./planegcs";
 import type { SketchClipboard } from "./sketchModel";
 import {
+    blockParamIndices,
     ConstraintKind,
     datumEntityData,
     datumPoint,
@@ -80,6 +81,7 @@ interface ConstraintParams {
     solverKind?: ConstraintKind;
     helperParams?: number[];
     helperConstraints?: number[];
+    blockedParams?: number[];
 }
 
 /** The kinds whose value arrives through a datum param rather than from the geometry. */
@@ -91,6 +93,7 @@ const DATUM_CONSTRAINTS: ReadonlySet<ConstraintKind> = new Set([
     ConstraintKind.HorizontalDistance,
     ConstraintKind.VerticalDistance,
     ConstraintKind.Fix,
+    ConstraintKind.Scale,
 ]);
 
 interface ConstraintRecord {
@@ -109,6 +112,7 @@ interface ConstraintRecord {
     direction?: [number, number];
     helperParams?: number[];
     helperConstraints?: number[];
+    blockedParams?: number[];
 }
 
 /**
@@ -517,6 +521,27 @@ export class SketchSolver implements ExternalEntityHost {
 
     // ------------------------------------------------------------------ Solving
 
+    /** Independent trial system retaining document expression scope. Caller owns disposal. */
+    fork(): SketchSolver {
+        return new SketchSolver(this.plane, this.toData(), this._scope);
+    }
+
+    /** Translate native tags, including helper equations, back to persistent constraint IDs. */
+    diagnose(): SolverDiagnosis {
+        const diagnosis = this.system.diagnose();
+        const mapIds = (ids: number[]) => {
+            const native = new Set(ids);
+            return [...this.constraints.values()]
+                .filter((c) => native.has(c.solverId) || c.helperConstraints?.some((id) => native.has(id)))
+                .map((c) => c.id);
+        };
+        return {
+            ...diagnosis,
+            conflicting: mapIds(diagnosis.conflicting),
+            redundant: mapIds(diagnosis.redundant),
+        };
+    }
+
     solve(fine: boolean): SolveOutcome {
         this.syncAngleDatumSide();
         let report = this.system.solve(fine);
@@ -802,6 +827,7 @@ export class SketchSolver implements ExternalEntityHost {
                 refs: record.refs.map((r) => ({ ...r })),
             };
             const sources = this.persistedDatums(record);
+            if (record.blockedParams) data.blockedParams = [...record.blockedParams];
             if (record.direction) data.direction = [...record.direction];
             if (sources !== undefined) {
                 if (sources.length === 1) {
@@ -1023,8 +1049,15 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     private addConstraintWithId(id: number, constraint: Omit<SketchConstraintData, "id">): void {
-        const { params, datumParamIds, datumSources, solverKind, helperParams, helperConstraints } =
-            this.buildConstraintParams(constraint, id);
+        const {
+            params,
+            datumParamIds,
+            datumSources,
+            solverKind,
+            helperParams,
+            helperConstraints,
+            blockedParams,
+        } = this.buildConstraintParams(constraint, id);
         const solverId = this.system.add_constraint(
             solverKind ?? constraint.kind,
             new Uint32Array(params),
@@ -1037,6 +1070,7 @@ export class SketchSolver implements ExternalEntityHost {
             kind: constraint.kind,
             refs: constraint.refs.map((r) => ({ ...r })),
             solverId,
+            blockedParams,
             datumParamIds,
             datumSources,
             direction: constraint.direction ? [...constraint.direction] : undefined,
@@ -1050,6 +1084,22 @@ export class SketchSolver implements ExternalEntityHost {
         constraint: Omit<SketchConstraintData, "id">,
         id: number,
     ): ConstraintParams {
+        if (constraint.kind === ConstraintKind.Block) {
+            const entityId = constraint.refs[0].entityId;
+            if (entityId < 1) throw new Error("Cannot block reference geometry");
+            const blockedParams = constraint.blockedParams ?? blockParamIndices(this.entity(entityId)!);
+            const params = blockedParams.map((i) => this.entityParams.get(entityId)![i]);
+            const values = Array.from(this.system.get_params(new Uint32Array(params)));
+            return {
+                ...this.withDatums(
+                    params,
+                    values.map((value, index) =>
+                        this.datumOf(id, constraint.kind, constraint.datums?.[index], () => value),
+                    ),
+                ),
+                blockedParams: [...blockedParams],
+            };
+        }
         if (constraint.direction) return this.directionalConstraintParams(constraint, id);
         if (DATUM_CONSTRAINTS.has(constraint.kind)) return this.datumConstraintParams(constraint, id);
         return { params: this.geometricConstraintParams(constraint) };
@@ -1103,6 +1153,9 @@ export class SketchSolver implements ExternalEntityHost {
     private geometricConstraintParams(constraint: Omit<SketchConstraintData, "id">): number[] {
         const { refs } = constraint;
         switch (constraint.kind) {
+            case ConstraintKind.Collinear:
+            case ConstraintKind.EqualAngle:
+                return this.pointParams(...refs);
             case ConstraintKind.P2PCoincident:
             case ConstraintKind.Horizontal:
             case ConstraintKind.Vertical:
@@ -1199,6 +1252,13 @@ export class SketchSolver implements ExternalEntityHost {
                         refs[1],
                         constraint.kind === ConstraintKind.HorizontalDistance ? 0 : 1,
                     ),
+                );
+            case ConstraintKind.Scale:
+                return this.withDatum(
+                    this.pointParams(...refs),
+                    id,
+                    constraint,
+                    () => this.currentDistance(refs[0], refs[1]) / this.currentDistance(refs[2], refs[3]),
                 );
             case ConstraintKind.Fix:
                 return this.fixConstraintParams(constraint, id);

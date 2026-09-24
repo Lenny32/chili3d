@@ -1,18 +1,25 @@
-name: Release MCP bridge
+name: Package MCP bridge
 
 # Standalone chili3d-mcp-bridge executables: users download one file and point their MCP client at
 # it, with no Node.js and no checkout.
 #
-# - Tag push ("0.7.1", as pushed by scripts/release.mjs): builds that tag, attaches the files to its
-#   GitHub release.
-# - Manual run (Actions > Release MCP bridge > Run workflow): builds the branch or tag picked in
+# - Called by deploy.yml (the CD) on every deploy: builds and verifies them only (run artifact).
+# - Manual run (Actions > Package MCP bridge > Run workflow): builds the branch or tag picked in
 #   "Use workflow from" with a version you type, and either only keeps the files as a downloadable run artifact or also
 #   publishes them as a (pre)release. The Run workflow button only exists for workflows on the
 #   default branch, and GitHub registers a new workflow from a push that changes its file.
 
 on:
-    push:
-        tags: ["[0-9]+.[0-9]+.[0-9]+"]
+    workflow_call:
+        inputs:
+            version:
+                description: "Version to stamp into the executables, e.g. 0.7.2 or 0.7.2-rc.1"
+                type: string
+                required: true
+            publish:
+                description: "artifact-only, prerelease or release"
+                type: string
+                default: artifact-only
     workflow_dispatch:
         inputs:
             version:
@@ -31,10 +38,10 @@ permissions:
     contents: read
 
 concurrency:
-    group: ${{ github.workflow }}-${{ inputs.version || github.ref_name }}
+    group: package-mcp-bridge-${{ inputs.version }}
 
 env:
-    VERSION: ${{ inputs.version || github.ref_name }}
+    VERSION: ${{ inputs.version }}
 
 jobs:
     prepare:
@@ -135,7 +142,7 @@ jobs:
                   echo "$reply" | grep -q '"serverInfo":{"name":"chili3d"'
 
     package:
-        name: Package ${{ inputs.version || github.ref_name }}
+        name: Package ${{ inputs.version }}
         needs: verify
         runs-on: ubuntu-latest
         permissions:
@@ -162,13 +169,13 @@ jobs:
                   if-no-files-found: error
 
             - name: Publish to GitHub release
-              if: github.event_name == 'push' || inputs.publish != 'artifact-only'
+              if: inputs.publish == 'prerelease' || inputs.publish == 'release'
               env:
                   GH_TOKEN: ${{ github.token }}
                   GH_REPO: ${{ github.repository }}
                   PRERELEASE: ${{ inputs.publish == 'prerelease' }}
               run: |
-                  # A tag push already has its tag; a manual run creates "$VERSION" at the built commit.
+                  # Reuses the tag if it already exists; otherwise creates "$VERSION" at the built commit.
                   flags=(--target "$GITHUB_SHA" --title "$VERSION" --generate-notes)
                   [ "$PRERELEASE" = true ] && flags+=(--prerelease)
                   if ! gh release view "$VERSION" >/dev/null 2>&1; then

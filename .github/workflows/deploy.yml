@@ -1,0 +1,100 @@
+name: Deploy
+
+# Continuous delivery: builds the web application, deploys it to GitHub Pages and builds the MCP
+# bridge that matches it (package-mcp-bridge.yml).
+#
+# - Push to main or manual run (Actions > Deploy > Run workflow): tests, builds and deploys the
+#   site; the bridge executables are built and verified (run artifact) but not published.
+# - Bridge releases are published by hand: Actions > Package MCP bridge > Run workflow, with
+#   publish = release. The site links the release of package.json's version.
+#
+# One-time setup: Settings > Pages > Source = "GitHub Actions".
+
+on:
+    push:
+        branches: ["main"]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+# Never cancel a deployment halfway; a newer push waits for the running one.
+concurrency:
+    group: deploy-${{ github.ref }}
+    cancel-in-progress: false
+
+jobs:
+    prepare:
+        name: Resolve version
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.version.outputs.version }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            # A build-only bridge version: this workflow never publishes the executables.
+            - id: version
+              run: |
+                  pkg=$(node -p "require('./package.json').version")
+                  echo "version=$pkg-build.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+                  echo "Deploying ${GITHUB_SHA::7} ($GITHUB_REF_NAME), app version $pkg" >> "$GITHUB_STEP_SUMMARY"
+
+    web:
+        name: Build web application
+        needs: prepare
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            # No npm cache: a cache written by a branch build would be restored by default-branch runs.
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+              with:
+                  node-version: 24
+
+            - run: npm ci
+
+            - run: npm run test
+
+            # Packs the npx bridge tarball into public/mcp/, bundles the app, builds the plugins.
+            - name: Build
+              run: npm run build
+              env:
+                  NODE_ENV: production
+
+            - name: Check output
+              run: |
+                  test -f dist/index.html
+                  ls dist/mcp/chili3d-mcp-bridge-*.tgz
+                  ls dist/*.wasm
+
+            - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+              with:
+                  path: dist
+
+    mcp-bridge:
+        name: MCP bridge
+        needs: prepare
+        uses: ./.github/workflows/package-mcp-bridge.yml
+        with:
+            version: ${{ needs.prepare.outputs.version }}
+            publish: artifact-only
+
+    deploy:
+        name: Deploy to GitHub Pages
+        needs: [web, mcp-bridge]
+        runs-on: ubuntu-latest
+        permissions:
+            pages: write
+            id-token: write
+        environment:
+            name: github-pages
+            url: ${{ steps.deployment.outputs.page_url }}
+        steps:
+            - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+            - id: deployment
+              uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

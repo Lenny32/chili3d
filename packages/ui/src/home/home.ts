@@ -186,7 +186,7 @@ export class Home extends HTMLElement {
             a(
                 {
                     className: style.socialItem,
-                    href: "https://github.com/xiangechen/chili3d",
+                    href: "https://github.com/lenny32/chili3d",
                     target: "_blank",
                     rel: "noopener noreferrer",
                 },

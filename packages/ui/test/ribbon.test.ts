@@ -159,7 +159,7 @@ describe("RibbonUI", () => {
     test("should render github link", () => {
         const { ui } = createRibbonUI();
         const link = mustQuery(ui, "a");
-        expect(link.getAttribute("href")).toBe("https://github.com/xiangechen/chili3d");
+        expect(link.getAttribute("href")).toBe("https://github.com/lenny32/chili3d");
     });
 
     test("should render ribbon groups for each tab", () => {

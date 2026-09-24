@@ -18,7 +18,6 @@ import {
     type Ribbon,
     type RibbonGroup,
     type RibbonTab,
-    type RibbonTabKeys,
 } from "@chili3d/core";
 import { a, collection, createIcon, div, label, span, svg } from "@chili3d/element";
 import style from "./ribbon.module.css";
@@ -183,7 +182,7 @@ export class RibbonUI extends HTMLElement {
         return div(
             { className: style.right },
             a(
-                { href: "https://github.com/xiangechen/chili3d", target: "_blank" },
+                { href: "https://github.com/lenny32/chili3d", target: "_blank" },
                 svg({ title: "Github", className: style.icon, icon: "icon-github" }),
             ),
         );

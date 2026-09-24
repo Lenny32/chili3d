@@ -31,6 +31,7 @@ import {
     profileExternalRefs,
     rawArcSweep,
     SKETCH_EDGE_LINE_WIDTH,
+    SKETCH_PROFILE_OPACITY,
     type SketchConstraintData,
     type SketchData,
     type SketchEntityData,
@@ -176,6 +177,7 @@ export class SketchNode extends ParameterShapeNode {
     protected override createMesh(): IShapeMeshData {
         const mesh = this.sketchMesh();
         if (mesh.edges !== undefined) mesh.edges.lineWidth = SKETCH_EDGE_LINE_WIDTH;
+        if (mesh.faces !== undefined) mesh.faces.opacity = SKETCH_PROFILE_OPACITY;
         return mesh;
     }
 

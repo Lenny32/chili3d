@@ -15,6 +15,7 @@ import {
     hilightEdgeMaterial,
     lockFaceMaterial,
     lockLineMaterial,
+    profileFaceMaterialOf,
     selectedEdgeMaterial,
     selectedFaceColoredMaterial,
     selectedVertexMaterial,
@@ -65,6 +66,18 @@ describe("materials", () => {
         test("selectedEdgeMaterial has linewidth 3", () => {
             expect(selectedEdgeMaterial).toBeInstanceOf(LineMaterial);
             expect(selectedEdgeMaterial.linewidth).toBe(3);
+        });
+    });
+
+    describe("profileFaceMaterialOf", () => {
+        test("returns a cached translucent material that does not write depth", () => {
+            const material = profileFaceMaterialOf(0.2);
+            expect(material).toBeInstanceOf(MeshLambertMaterial);
+            expect(material.transparent).toBe(true);
+            expect(material.opacity).toBeCloseTo(0.2);
+            expect(material.depthWrite).toBe(false);
+            expect(profileFaceMaterialOf(0.2)).toBe(material);
+            expect(profileFaceMaterialOf(0.5)).not.toBe(material);
         });
     });
 

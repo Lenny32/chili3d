@@ -14,6 +14,7 @@ export const DefaultDarkGridColor = 0xd0d0d0;
 
 export class VisualItemConfig extends Observable {
     defaultFaceColor = 0xdedede;
+    profileFaceColor = 0x6fa8e0;
     highlightEdgeColor = 0x33ff33;
     highlightFaceColor = 0x99ff00;
     selectedEdgeColor = 0x33ff33;

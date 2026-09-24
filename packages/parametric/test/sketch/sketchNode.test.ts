@@ -20,7 +20,7 @@ import {
     TestDocument,
 } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
-import type { ExternalRefData, SketchData } from "../../src/sketch/sketchModel";
+import { type ExternalRefData, SKETCH_PROFILE_OPACITY, type SketchData } from "../../src/sketch/sketchModel";
 import { danglingProfileRefs, SketchNode } from "../../src/sketch/sketchNode";
 
 function fakeShape(name: string) {
@@ -422,6 +422,7 @@ describe("SketchNode", () => {
         expect(node.mesh.faces).toBeDefined();
         expect(node.mesh.faces!.range.length).toBe(1);
         expect(node.mesh.faces!.range[0].shape).toBe(face);
+        expect(node.mesh.faces!.opacity).toBe(SKETCH_PROFILE_OPACITY);
         expect(node.mesh.edges!.lineWidth).toBe(2);
 
         node.setShowProfileFaces(false);

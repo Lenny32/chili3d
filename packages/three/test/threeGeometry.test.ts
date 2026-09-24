@@ -2,9 +2,9 @@
 // See LICENSE file in the project root for full license information.
 
 import { ShapeTypes } from "@chili3d/core";
-import { Box3, Mesh, MeshBasicMaterial, Points } from "three";
+import { Box3, Mesh, MeshBasicMaterial, MeshLambertMaterial, Points } from "three";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
-import { defaultEdgeMaterial, edgeMaterialOfWidth } from "../src/materials";
+import { defaultEdgeMaterial, edgeMaterialOfWidth, profileFaceMaterialOf } from "../src/materials";
 import { ThreeGeometry } from "../src/threeGeometry";
 import type { ThreeVisualContext } from "../src/threeVisualContext";
 import { createTestGeometryNode, createThreeMockVisualContext } from "./mocks";
@@ -166,6 +166,18 @@ describe("ThreeGeometry", () => {
             geo.setEdgesMateiralTemperary({ isLineMaterial: true } as any);
             geo.removeTemperaryMaterial();
             expect(geo.edges()?.material).toBe(wideMaterial);
+        });
+
+        test("faces with an opacity override use the translucent profile material and restore to it", () => {
+            const node = createTestGeometryNode({ faceOpacity: 0.2 });
+            const geo = new ThreeGeometry(node, context);
+            const profileMaterial = profileFaceMaterialOf(0.2);
+
+            expect(geo.faces()?.material).toBe(profileMaterial);
+
+            geo.setFacesMateiralTemperary(new MeshLambertMaterial());
+            geo.removeTemperaryMaterial();
+            expect(geo.faces()?.material).toBe(profileMaterial);
         });
     });
 

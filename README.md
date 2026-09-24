@@ -1,231 +1,93 @@
-# Chili3D
+# chili3d (Lenny32 fork)
 
-A browser-based 3D CAD application for online model design and editing.
+A 3D CAD application that runs in the browser. OpenCascade (OCCT) is compiled to WebAssembly for the modeling kernel and Three.js does the rendering, so there is nothing to install.
 
 ![Screenshot](./screenshots/screenshot.png)
 
-## Overview
+## About this fork
 
-[Chili3D](https://chili3d.com) is an [open-source](https://github.com/lenny32/chili3d) browser-based 3D CAD (Computer-Aided Design) application built with TypeScript. It achieves near-native performance by compiling OpenCascade (OCCT) to WebAssembly and integrating with Three.js, enabling powerful online modeling, editing, and rendering — all without requiring local installation.
+This repository started as a fork of [xiangechen/chili3d](https://github.com/xiangechen/chili3d). It is no longer kept in sync with upstream: we are taking it in our own direction, and changes are not sent back. Expect the two to drift further apart over time.
 
-You can access Chili3D online at:
+If you want the original project, its website ([chili3d.com](https://chili3d.com)), its releases or its author, go upstream. Please don't report issues from this fork there.
 
-- Official website: [chili3d.com](https://chili3d.com)
-- Cloudflare deployment: [chili3d.pages.dev](https://chili3d.pages.dev)
+What we have added so far:
+
+- A 2D sketch solver based on PlaneGCS, used by the parametric sketch module
+- An MCP server that runs inside the page, plus a small bridge program (`packages/mcp-bridge`) so Claude Code, Claude Desktop, Cursor and other MCP clients can drive the open document. See the [bridge README](packages/mcp-bridge/README.md).
+- A ribbon laid out like Fusion 360's, with context-aware shortcuts
+- An adaptive background grid in the viewport
+- CI: lint, typecheck, CodeQL, Semgrep and a dependency audit on pull requests to `develop` and `main`; the test suite runs on pull requests to `main`
 
 ## Features
 
-### Modeling Tools
+Most of this comes from upstream.
 
-- **Basic Shapes**: Create boxes, cylinders, cones, spheres, pyramids, torus, and more
-- **2D Sketching**: Draw lines, arcs, circles, ellipses, rectangles, polygons, and Bézier curves
-- **Advanced Operations**:
-    - Boolean operations (union, difference, intersection)
-    - Extrusion and revolution
-    - Sweeping and lofting
-    - Offset surfaces and thick solid
-    - Linear and circular arrays
-    - Shape checking and repair
+- Primitives: box, cylinder, cone, sphere, pyramid, torus and more
+- Sketching: lines, arcs, circles, ellipses, rectangles, polygons, Bézier curves
+- Parametric bodies built from an ordered feature list, re-evaluated when anything upstream changes
+- Booleans, extrude, revolve, sweep, loft, offset, thick solid, linear and circular arrays
+- Chamfer, fillet, trim, break, split, sew, simplify, feature removal, explode
+- Move, rotate, mirror
+- Snapping to points, edges, faces and the workplane, with axis tracking
+- Length, angle, area and volume measurement
+- STEP, IGES, BREP and STL import/export
+- Undo/redo, documents stored in IndexedDB
+- Plugins loaded at runtime with `?plugin=<url>` (examples in `plugins/`: hello world in JS and TS, macros, a node-based visual programming editor)
+- UI in English, Chinese, Brazilian Portuguese and Russian
 
-### Snapping and Tracking
+## Getting started
 
-- **Object Snapping**: Precisely snap to geometric features (points, edges, faces)
-- **Workplane Snapping**: Snap to the current workplane for accurate planar operations
-- **Axis Tracking**: Create objects along tracked axes for precise alignment
-- **Feature Point Detection**: Automatically detect and snap to key geometric features
-- **Tracking Visualization**: Visual guides showing tracking lines and reference points
-
-### Editing Tools
-
-- **Modification**: Chamfer, fillet, trim, break, split, sew, simplify
-- **Transformation**: Move, rotate, mirror, linear array, circular array
-- **Advanced Editing**:
-    - Feature removal
-    - Sub-shape manipulation
-    - Explode compound objects
-
-### Measurement Tools
-
-- Measure angles and lengths
-- Calculate the sum of length, area, and volume
-
-### Document Management
-
-- Create, open, and save documents
-- Full undo/redo stack with transaction history
-- Import/export of industry-standard formats (STEP, IGES, BREP, STL)
-
-### User Interface
-
-- Office-style ribbon interface with contextual command organization
-- Hierarchical assembly management with flexible grouping capabilities
-- Dynamic workplane support
-- 3D viewport with camera controls and camera position recall
-- Command context panel integrated into the viewport
-
-### Plugin System
-
-Chili3D supports a runtime plugin system with dynamic loading via URL parameters (`?plugin=`). Example plugins include:
-
-- **helloworld-js** / **helloworld-ts** — Demo plugins showcasing the plugin API
-- **macro** — Create, edit, and run macros to automate repetitive tasks
-- **visual-programming** — Visual programming with a node-based editor (powered by Rete.js)
-
-### Localization
-
-- **Multi-Language Support**: Built-in internationalization (i18n) with seamless locale switching
-- **Current Languages**: Chinese (zh-cn), English (en), Portuguese — Brazil (pt-br)
-- Contributions for additional languages are welcome
-
-## Architecture
-
-Chili3D uses an npm workspace monorepo under `packages/` with an interface-driven, pluggable backend architecture:
-
-```
-web ──> builder ──> app ──> core
-                  ──> i18n ──> core
-                  ──> three ──> core
-                  ──> ui ──> core + element
-                  ──> wasm ──> core
-                  ──> storage ──> core
-
-element ──> core
-```
-
-- **`core`** — Abstract interfaces (`IShape`, `IShapeFactory`), math (`XYZ`, `Matrix4`, `Plane`), document model, reactive data (`Observable`, `Binding`, `PubSub`), `Result<T,E>`, transactions/undo/redo, commands, serialization, plugin system, service container, UI abstractions
-- **`wasm`** — Concrete `ShapeFactory` calling into OCCT via Emscripten bindings
-- **`three`** — Three.js viewport, camera controller, visual objects, highlighter, outline pass, gizmo, mesh export
-- **`element`** — Custom reactive DOM elements (radio groups, expanders, data converters)
-- **`ui`** — Application chrome: main window, ribbon/toolbar, property panels, project tree, dialogs, toast, status bar
-- **`app`** — Concrete `Application`, body node classes, command implementations, `CommandService`, `HotkeyService`
-- **`builder`** — `AppBuilder` with a fluent `.useIndexedDB().useWasmOcc().useThree().useUI().build()` chain and default ribbon layout
-- **`i18n`** — Locale data (en, zh-cn, pt-br)
-- **`storage`** — IndexedDB persistence layer
-- **`web`** — Entry point: calls `AppBuilder`, shows loading screen, parses URL parameters
-
-## Technology Stack
-
-- **Frontend**: TypeScript, Three.js (0.184)
-- **3D Kernel**: OpenCascade 8.0.0 (OCCT) compiled to WebAssembly via Emscripten
-- **Bundler**: Rspack 2
-- **Linting & Formatting**: Biome (TypeScript), clang-format (C++)
-- **Testing**: Rstest + Happy-DOM
-- **Package Manager**: npm workspaces
-
-## Changelog
-
-You can view the full changelog [here](https://github.com/lenny32/chili3d/releases).
-
-For Chinese users, you can also browse the [media](https://space.bilibili.com/539380032/lists/3108412?type=season).
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js
-- npm
-
-### Installation
-
-1. Clone the repository
-
-    ```bash
-    git clone https://github.com/lenny32/chili3d.git
-    cd chili3d
-    ```
-
-2. Install dependencies
-
-    ```bash
-    npm install
-    ```
-
-### Development
-
-Start the development server:
+You need Node.js and npm.
 
 ```bash
-npm run dev   # Launches at http://localhost:8080
+git clone https://github.com/lenny32/chili3d.git
+cd chili3d
+npm install
+npm run dev     # http://localhost:8080
 ```
 
-### Building
-
-Build the application:
+Other scripts:
 
 ```bash
-npm run build
+npm run build   # production build
+npm run test    # tests (Rstest + Happy-DOM); testc for coverage
+npm run check   # Biome lint with auto-fix, run it before committing
+npm run format  # Biome + clang-format
 ```
 
-### WASM Build (Optional)
+The WebAssembly module is prebuilt and committed. To rebuild it from `cpp/`, run `npm run setup:wasm` once, then `npm run build:wasm`.
 
-The prebuilt WASM module is included in the repository. If you want to build it from source:
+With Docker, `docker compose up -d` builds the app and serves it on port 8080.
 
-1. Set up WebAssembly dependencies (one-time setup):
+## Layout
 
-    ```bash
-    npm run setup:wasm
-    ```
+npm workspace under `packages/`:
 
-2. Build the WebAssembly module:
+| Package | What's in it |
+|---|---|
+| `core` | Interfaces, math, document model, reactive data, `Result`, undo, commands, serialization, plugins |
+| `parametric` | Feature-list bodies and the sketch module |
+| `wasm` | OCCT shape factory through Emscripten |
+| `three` | Viewport, camera, visuals, highlighting, gizmo |
+| `element`, `ui` | Custom elements and the app chrome (ribbon, panels, tree, dialogs) |
+| `app` | `Application`, body nodes, commands, hotkeys |
+| `ai` | In-app assistant tools and the MCP server |
+| `mcp-bridge` | stdio ⇄ WebSocket relay for MCP clients |
+| `builder` | `AppBuilder`, which wires everything together at startup |
+| `i18n`, `storage`, `web` | Translations, IndexedDB, entry point |
 
-    ```bash
-    npm run build:wasm
-    ```
-
-### Testing & Linting
-
-```bash
-npm run test    # Run all tests (Rstest + Happy-DOM)
-npm run testc   # Tests with coverage
-npm run check   # Biome lint + auto-fix
-npm run format  # Biome + clang-format across all files
-```
-
-### Docker
-
-You can also deploy with Docker:
-
-```bash
-docker compose up -d   # Builds and serves the app at http://localhost:8080
-```
-
-## Code Style
-
-- **TypeScript**: Biome for linting and formatting — 4-space indent, 110-char line width, double quotes, semicolons always
-- **C++**: clang-format with WebKit style
-- Interfaces prefixed with `I` (`IShape`, `ICommand`)
-- `camelCase` functions/variables, `PascalCase` classes, `UPPER_SNAKE_CASE` constants
-- Type-only imports: `import type { IFoo } from "..."`
-- Pre-commit hooks via simple-git-hooks + lint-staged
+Stack: TypeScript, Three.js, OCCT 8 via Emscripten, Rspack, Biome, Rstest.
 
 ## Contributing
 
-We welcome contributions! Please feel free to submit pull requests or open issues.
-
-Before submitting a PR, run `npm run check` to ensure your code passes linting.
-
-## Contact
-
-- **Discussions**: Join our [GitHub discussions](https://github.com/lenny32/chili3d/discussions) for general chat or questions
-- **Issues**: Use [GitHub issues](https://github.com/lenny32/chili3d/issues) to report suggestions or bugs
-- **Email**: Contact us privately at xiangetg@msn.cn
+Issues and pull requests are welcome on this repository. Branch from `develop` and target `develop`. Run `npm run check` and `npm run test` before opening one.
 
 ## License
 
-Distributed under the GNU Affero General Public License v3.0 (AGPL-3.0). For commercial licensing options, contact xiangetg@msn.cn.
+AGPL-3.0, see [LICENSE](LICENSE). The C++ code in `cpp/` is LGPL-3.0.
 
-Full license details: [LICENSE](LICENSE)
-
-The C++ WASM module (`cpp/`) is licensed under LGPL-3.0.
-
-## Analytics Notice
-
-Chili3D uses [Microsoft Clarity](https://clarity.microsoft.com) for growth analytics. To disable data collection, remove the Clarity script from `public/index.html`.
+The code inherited from upstream stays under the copyright of its authors. Commercial licensing of that code is handled by the upstream author, not by this fork.
 
 ## Disclaimer
 
-This software is provided "AS IS," and the authors and contributors hereby disclaim all express and implied warranties. The user shall bear full responsibility for any and all risks and potential consequences arising from the use of this software. Such risks and consequences include, but are not limited to:
-
-1. Data loss, system failures, or any direct or indirect damages;
-2. Conduct violating applicable laws or regulations resulting from software usage and its consequences;
-3. All liabilities arising from the software's use for illegal purposes or activities.
+The software is provided as is, without any warranty. You use it at your own risk, including the risk of data loss.

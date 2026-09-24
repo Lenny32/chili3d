@@ -402,7 +402,7 @@ export class SketchAnnotationManager implements IDisposable {
         const entity = this.solver.entity(entityId);
         if (entity === undefined) return undefined;
         const off = BADGE_OFFSET_PX * px;
-        if (entity.type === "point" || entity.type === "ellipse") {
+        if (entity.type === "point" || entity.type === "ellipse" || entity.type === "spline") {
             return pointBadgeAnchor([entity.params[0], entity.params[1]], px);
         }
         if (entity.type === "line") {

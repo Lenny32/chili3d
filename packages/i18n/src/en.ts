@@ -205,6 +205,9 @@ export default {
         "command.sketch.circle": "Circle",
         "command.sketch.polygon": "Polygon",
         "command.sketch.ellipse": "Ellipse",
+        "command.sketch.spline": "Spline",
+        "prompt.pickSplinePoint":
+            "Pick next spline point; Enter to finish, Esc to cancel (interior points stay fixed)",
         "command.sketch.point": "Point",
         "sketch.polygon.inscribed": "Inscribed (off: circumscribed)",
         "sketch.ellipse.foci": "Use two foci",

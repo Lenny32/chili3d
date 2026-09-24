@@ -4,6 +4,7 @@
 import "./sketchArc";
 import "./sketchCircle";
 import "./sketchEllipse";
+import "./sketchSpline";
 import "./sketchPoint";
 import "./sketchPolygon";
 import "./sketchCommands";

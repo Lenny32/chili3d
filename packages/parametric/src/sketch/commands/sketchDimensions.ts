@@ -246,7 +246,7 @@ export class AngleDimensionCommand extends SketchConstraintCommand {
         // datum: true — angles against the X/Y axes are a common reference
         const l1Id = await editor.pickEntity(
             "prompt.pickSketchEntity",
-            "line",
+            ["line", "spline"],
             { datum: true },
             this.controller,
         );
@@ -254,7 +254,7 @@ export class AngleDimensionCommand extends SketchConstraintCommand {
         this.controller = new AsyncController();
         const l2Id = await editor.pickEntity(
             "prompt.pickSketchEntity",
-            "line",
+            ["line", "spline"],
             { datum: true },
             this.controller,
         );

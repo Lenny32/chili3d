@@ -21,6 +21,8 @@ export { ConstraintKind };
 
 /** Screen-pixel line width of sketch geometry (entity edges, in and out of the editor). */
 export const SKETCH_EDGE_LINE_WIDTH = 2;
+/** Profile faces are shaded translucent so a sketch reads as curves, not a solid disc. */
+export const SKETCH_PROFILE_OPACITY = 0.2;
 
 export type SketchEntityType = "line" | "circle" | "arc";
 

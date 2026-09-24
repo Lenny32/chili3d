@@ -220,6 +220,12 @@ export interface FaceMeshData extends ShapeMeshData {
     normal: Float32Array;
     uv: Float32Array;
     groups: MeshGroup[];
+    /**
+     * Display-only override: faces are drawn with a shared translucent material of this
+     * opacity instead of the node's material (e.g. sketch profiles, which stay pickable
+     * but must not hide what lies behind them).
+     */
+    opacity?: number;
 }
 
 export abstract class MeshDataBuilder<T extends ShapeMeshData> {

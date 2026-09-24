@@ -9,9 +9,12 @@ import { type ObjectSnapType, ObjectSnapTypes, ObjectSnapTypeUtils } from "./sna
 
 export const DefaultLightEdgeColor = 0x333333;
 export const DefaultDarkEdgeColor = 0xeeeeee;
+export const DefaultLightGridColor = 0x303030;
+export const DefaultDarkGridColor = 0xd0d0d0;
 
 export class VisualItemConfig extends Observable {
     defaultFaceColor = 0xdedede;
+    profileFaceColor = 0x6fa8e0;
     highlightEdgeColor = 0x33ff33;
     highlightFaceColor = 0x99ff00;
     selectedEdgeColor = 0x33ff33;
@@ -33,8 +36,16 @@ export class VisualItemConfig extends Observable {
         this.setProperty("defaultEdgeColor", value);
     }
 
+    get gridColor() {
+        return this.getPrivateValue("gridColor", DefaultLightGridColor);
+    }
+    set gridColor(value: number) {
+        this.setProperty("gridColor", value);
+    }
+
     applyTheme(theme: "light" | "dark") {
         this.defaultEdgeColor = theme === "light" ? DefaultLightEdgeColor : DefaultDarkEdgeColor;
+        this.gridColor = theme === "light" ? DefaultLightGridColor : DefaultDarkGridColor;
     }
 }
 
@@ -88,6 +99,14 @@ export class Config extends Observable {
     }
     set dynamicWorkplane(value: boolean) {
         this.setProperty("dynamicWorkplane", value);
+    }
+
+    @serialize()
+    get showGrid() {
+        return this.getPrivateValue("showGrid", true);
+    }
+    set showGrid(value: boolean) {
+        this.setProperty("showGrid", value);
     }
 
     @serialize()

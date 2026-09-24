@@ -424,6 +424,7 @@ export default {
         "viewport.perspective": "Перспектива",
         "viewport.zoomIn": "Увеличить",
         "viewport.zoomOut": "Уменьшить",
+        "viewport.grid": "Показать сетку",
         "viewport.mode.solid": "Поверхность",
         "viewport.mode.wireframe": "Каркас",
         "viewport.mode.solidAndWireframe": "Поверхность и каркас",

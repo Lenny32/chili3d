@@ -6,7 +6,7 @@ A browser-based 3D CAD application for online model design and editing.
 
 ## Overview
 
-[Chili3D](https://chili3d.com) is an [open-source](https://github.com/xiangechen/chili3d) browser-based 3D CAD (Computer-Aided Design) application built with TypeScript. It achieves near-native performance by compiling OpenCascade (OCCT) to WebAssembly and integrating with Three.js, enabling powerful online modeling, editing, and rendering — all without requiring local installation.
+[Chili3D](https://chili3d.com) is an [open-source](https://github.com/lenny32/chili3d) browser-based 3D CAD (Computer-Aided Design) application built with TypeScript. It achieves near-native performance by compiling OpenCascade (OCCT) to WebAssembly and integrating with Three.js, enabling powerful online modeling, editing, and rendering — all without requiring local installation.
 
 You can access Chili3D online at:
 
@@ -114,7 +114,7 @@ element ──> core
 
 ## Changelog
 
-You can view the full changelog [here](https://github.com/xiangechen/chili3d/releases).
+You can view the full changelog [here](https://github.com/lenny32/chili3d/releases).
 
 For Chinese users, you can also browse the [media](https://space.bilibili.com/539380032/lists/3108412?type=season).
 
@@ -130,7 +130,7 @@ For Chinese users, you can also browse the [media](https://space.bilibili.com/53
 1. Clone the repository
 
     ```bash
-    git clone https://github.com/xiangechen/chili3d.git
+    git clone https://github.com/lenny32/chili3d.git
     cd chili3d
     ```
 
@@ -206,8 +206,8 @@ Before submitting a PR, run `npm run check` to ensure your code passes linting.
 
 ## Contact
 
-- **Discussions**: Join our [GitHub discussions](https://github.com/xiangechen/chili3d/discussions) for general chat or questions
-- **Issues**: Use [GitHub issues](https://github.com/xiangechen/chili3d/issues) to report suggestions or bugs
+- **Discussions**: Join our [GitHub discussions](https://github.com/lenny32/chili3d/discussions) for general chat or questions
+- **Issues**: Use [GitHub issues](https://github.com/lenny32/chili3d/issues) to report suggestions or bugs
 - **Email**: Contact us privately at xiangetg@msn.cn
 
 ## License

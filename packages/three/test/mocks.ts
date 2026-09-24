@@ -141,6 +141,7 @@ export function createTestGeometryNode(
         hasEdges?: boolean;
         hasVertexs?: boolean;
         edgeLineWidth?: number;
+        faceOpacity?: number;
     } = {},
 ): GeometryNode & Notifiable {
     const listeners: Array<(prop: string) => void> = [];
@@ -208,6 +209,7 @@ export function createTestGeometryNode(
                       index: new Uint32Array([0, 1, 2]),
                       groups: [],
                       color: 0x00ff00,
+                      opacity: overrides.faceOpacity,
                       range: [{ start: 0, count: 3, shape: faceShape }],
                   } as any)
                 : null,

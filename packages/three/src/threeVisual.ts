@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    Config,
     type IDocument,
     type IEventHandler,
     type IMeshExporter,
@@ -11,6 +12,7 @@ import {
 } from "@chili3d/core";
 import { AmbientLight, AxesHelper, Object3D, Scene } from "three";
 import { ThreeMeshExporter } from "./meshExporter";
+import { ThreeGrid } from "./threeGrid";
 import { ThreeHighlighter } from "./threeHighlighter";
 import { ThreeView } from "./threeView";
 import { ThreeViewHandler } from "./threeViewEventHandler";
@@ -23,6 +25,7 @@ export class ThreeVisual implements IVisual {
     readonly scene: Scene;
     readonly highlighter: ThreeHighlighter;
     readonly meshExporter: IMeshExporter;
+    readonly grid: ThreeGrid;
 
     viewHandler: IEventHandler;
     eventHandler: IEventHandler;
@@ -32,6 +35,8 @@ export class ThreeVisual implements IVisual {
         readonly document: IDocument,
         defaultEventHandler: IEventHandler,
     ) {
+        this.grid = new ThreeGrid();
+        this.grid.visible = Config.instance.showGrid;
         this.scene = this.initScene();
         this.defaultEventHandler = defaultEventHandler;
         this.viewHandler = new ThreeViewHandler();
@@ -39,13 +44,21 @@ export class ThreeVisual implements IVisual {
         this.highlighter = new ThreeHighlighter(this.context);
         this.meshExporter = new ThreeMeshExporter(this.context);
         this.eventHandler = this.defaultEventHandler;
+        Config.instance.onPropertyChanged(this.onConfigChanged);
     }
+
+    private readonly onConfigChanged = (property: keyof Config) => {
+        if (property === "showGrid") {
+            this.grid.visible = Config.instance.showGrid;
+            this.update();
+        }
+    };
 
     initScene() {
         const scene = new Scene();
         const envLight = new AmbientLight(0x888888, 4);
         const axisHelper = new AxesHelper(250);
-        scene.add(envLight, axisHelper);
+        scene.add(envLight, axisHelper, this.grid);
         return scene;
     }
 
@@ -60,6 +73,7 @@ export class ThreeVisual implements IVisual {
     }
 
     dispose() {
+        Config.instance.removePropertyChanged(this.onConfigChanged);
         this.context.dispose();
         this.defaultEventHandler.dispose();
         this.eventHandler.dispose();

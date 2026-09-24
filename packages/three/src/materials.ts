@@ -102,6 +102,28 @@ export const selectedEdgeMaterial = new LineMaterial({
     polygonOffsetUnits: -4,
 });
 
+const profileFaceMaterials = new Map<number, MeshLambertMaterial>();
+
+/**
+ * Shared translucent material for faces whose mesh data carries an `opacity` override
+ * (sketch profiles). Cached per opacity like `edgeMaterialOfWidth`. `depthWrite` is off
+ * so the grid and geometry behind the profile keep showing through.
+ */
+export function profileFaceMaterialOf(opacity: number): MeshLambertMaterial {
+    let material = profileFaceMaterials.get(opacity);
+    if (!material) {
+        material = new MeshLambertMaterial({
+            color: ThreeHelper.fromColor(VisualConfig.profileFaceColor),
+            side: DoubleSide,
+            transparent: true,
+            opacity,
+            depthWrite: false,
+        });
+        profileFaceMaterials.set(opacity, material);
+    }
+    return material;
+}
+
 export const faceTransparentMaterial = new MeshLambertMaterial({
     transparent: true,
     side: DoubleSide,

@@ -36,6 +36,7 @@ import {
     edgeMaterialOfWidth,
     lockFaceMaterial,
     lockLineMaterial,
+    profileFaceMaterialOf,
 } from "./materials";
 import { ThreeGeometryFactory, TopRenderOrder } from "./threeGeometryFactory";
 import { ThreeHelper } from "./threeHelper";
@@ -186,6 +187,10 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
     private initFaces(data: FaceMeshData) {
         const buff = ThreeGeometryFactory.createFaceBufferGeometry(data);
         if (data.groups.length > 1) buff.groups = data.groups;
+        this._faceMaterial =
+            data.opacity === undefined
+                ? this.context.getMaterial(this.geometryNode.materialId)
+                : profileFaceMaterialOf(data.opacity);
         this._faces = new Mesh(buff, this._faceMaterial);
         this._faces.layers.set(Constants.Layers.Solid);
         if (this._renderOnTop) this.applyOnTopMaterial(this._faces, this._faceMaterial);

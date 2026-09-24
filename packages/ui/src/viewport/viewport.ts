@@ -5,6 +5,7 @@ import {
     type Act,
     Binding,
     type CameraType,
+    Config,
     I18n,
     type IConverter,
     type IEventHandler,
@@ -28,6 +29,12 @@ class CameraConverter implements IConverter<CameraType> {
             return Result.ok(style.actived);
         }
         return Result.ok("");
+    }
+}
+
+class GridConverter implements IConverter<boolean> {
+    convert(value: boolean): Result<string, string> {
+        return Result.ok(value ? style.actived : "");
     }
 }
 
@@ -78,6 +85,7 @@ export class Viewport extends HTMLElement {
                           onclick: (e) => e.stopPropagation(),
                       },
                       this.createCameraControls(),
+                      this.createDisplayControls(),
                       this.createActionControls(),
                   )
                 : "",
@@ -90,6 +98,23 @@ export class Viewport extends HTMLElement {
             { className: style.border },
             this.createCameraControl("orthographic", "icon-orthographic"),
             this.createCameraControl("perspective", "icon-perspective"),
+        );
+    }
+
+    private createDisplayControls() {
+        return div(
+            { className: style.border },
+            div(
+                { className: new Binding(Config.instance, "showGrid", new GridConverter()) },
+                svg({
+                    icon: "icon-grid",
+                    title: new Localize("viewport.grid"),
+                    onclick: (e) => {
+                        e.stopPropagation();
+                        Config.instance.showGrid = !Config.instance.showGrid;
+                    },
+                }),
+            ),
         );
     }
 

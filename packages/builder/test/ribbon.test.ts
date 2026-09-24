@@ -1,210 +1,173 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { I18N_KEYS, type RibbonTabProfile } from "@chili3d/core";
 import { SketchRibbonProfiles } from "@chili3d/parametric";
 import { DefaultRibbon, mergeRibbonProfiles, ParametricRibbonProfiles } from "../src/ribbon";
 
+/** The order `AppBuilder.useParametric` applies the extras in. */
+const parametricExtras = [...ParametricRibbonProfiles, ...SketchRibbonProfiles];
+
+function findGroup(tabs: RibbonTabProfile[], tabName: string, groupName: string) {
+    const group = tabs.find((t) => t.tabName === tabName)?.groups.find((g) => g.groupName === groupName);
+    expect(group).not.toBeUndefined();
+    return group!;
+}
+
 describe("DefaultRibbon", () => {
-    test("should be a non-empty array of tab profiles", () => {
-        expect(Array.isArray(DefaultRibbon)).toBe(true);
-        expect(DefaultRibbon.length).toBeGreaterThan(0);
+    test("should have the SOLID / SURFACE / UTILITIES workflow tabs", () => {
+        expect(DefaultRibbon.map((t) => t.tabName)).toEqual([
+            "ribbon.tab.solid",
+            "ribbon.tab.surface",
+            "ribbon.tab.utilities",
+        ]);
     });
 
-    test("each tab should have a tabName and groups", () => {
-        for (const tab of DefaultRibbon) {
-            expect(tab.tabName).toBeDefined();
-            expect(typeof tab.tabName).toBe("string");
-            expect(Array.isArray(tab.groups)).toBe(true);
-        }
+    test("SOLID should have Fusion's task groups", () => {
+        expect(DefaultRibbon[0].groups.map((g) => g.groupName)).toEqual([
+            "ribbon.group.create",
+            "ribbon.group.modify",
+            "ribbon.group.assemble",
+            "ribbon.group.construct",
+            "ribbon.group.inspect",
+            "ribbon.group.insert",
+        ]);
     });
 
-    test("each group should have a groupName and items array", () => {
-        for (const tab of DefaultRibbon) {
-            for (const group of tab.groups) {
-                expect(group.groupName).toBeDefined();
-                expect(typeof group.groupName).toBe("string");
-                expect(Array.isArray(group.items)).toBe(true);
-            }
-        }
+    test("SURFACE should have create, modify and convert groups", () => {
+        expect(DefaultRibbon[1].groups.map((g) => g.groupName)).toEqual([
+            "ribbon.group.create",
+            "ribbon.group.modify",
+            "ribbon.group.convert",
+        ]);
     });
 
-    test("first tab should be model tab", () => {
-        expect(DefaultRibbon[0].tabName).toBe("ribbon.tab.model");
-    });
-
-    test("second tab should be manager tab", () => {
-        expect(DefaultRibbon[1].tabName).toBe("ribbon.tab.manager");
-    });
-
-    test("should not contain any sketch commands without useParametric", () => {
-        const allItems = flattenItems(DefaultRibbon.flatMap((t) => t.groups.flatMap((g) => g.items)));
-        expect(allItems.some((x) => x.startsWith("sketch."))).toBe(false);
-        expect(DefaultRibbon.some((t) => t.tabName === "ribbon.tab.sketch")).toBe(false);
-    });
-
-    test("model tab should contain draw, modify, converter, boolean groups", () => {
-        const modelTab = DefaultRibbon[0];
-        const groupNames = modelTab.groups.map((g) => g.groupName);
-        expect(groupNames).toContain("ribbon.group.draw");
-        expect(groupNames).toContain("ribbon.group.modify");
-        expect(groupNames).toContain("ribbon.group.converter");
-        expect(groupNames).toContain("ribbon.group.boolean");
-        expect(groupNames).toContain("ribbon.group.workingPlane");
-        expect(groupNames).toContain("ribbon.group.tools");
-        expect(groupNames).toContain("ribbon.group.measure");
-        expect(groupNames).toContain("ribbon.group.act");
-        expect(groupNames).toContain("ribbon.group.importExport");
-    });
-
-    test("draw group should contain create commands", () => {
-        const drawGroup = DefaultRibbon[0].groups.find((g) => g.groupName === "ribbon.group.draw");
-        expect(drawGroup).toBeDefined();
-        const allItems = flattenItems(drawGroup!.items);
-        expect(allItems).toContain("create.extrude");
-        expect(allItems).toContain("create.box");
-    });
-
-    test("modify group should contain modify commands", () => {
-        const modifyGroup = DefaultRibbon[0].groups.find((g) => g.groupName === "ribbon.group.modify");
-        expect(modifyGroup).toBeDefined();
-        const allItems = flattenItems(modifyGroup!.items);
-        expect(allItems).toContain("modify.move");
-        expect(allItems).toContain("modify.rotate");
-        expect(allItems).toContain("modify.fillet");
-    });
-
-    test("boolean group should contain boolean commands", () => {
-        const booleanGroup = DefaultRibbon[0].groups.find((g) => g.groupName === "ribbon.group.boolean");
-        expect(booleanGroup).toBeDefined();
-        const allItems = flattenItems(booleanGroup!.items);
-        expect(allItems).toContain("boolean.common");
-        expect(allItems).toContain("boolean.cut");
-        expect(allItems).toContain("boolean.join");
-    });
-
-    test("split-type items should have type and items properties", () => {
-        const drawGroup = DefaultRibbon[0].groups.find((g) => g.groupName === "ribbon.group.draw");
-        const splitItems = drawGroup!.items.filter(
-            (item) => typeof item === "object" && "type" in item && item.type === "split",
+    test("should only hold direct-modeling commands", () => {
+        const all = DefaultRibbon.flatMap((t) =>
+            t.groups.flatMap((g) => [...flattenItems(g.items), ...(g.collapsedItems ?? [])]),
         );
-        expect(splitItems.length).toBeGreaterThan(0);
-        // The filter above guarantees every entry is a split item.
-        for (const split of splitItems as { type: string; items: unknown[] }[]) {
-            expect(split.type).toBe("split");
-            expect(Array.isArray(split.items)).toBe(true);
+        expect(all.some((x) => x.startsWith("feature.") || x.startsWith("sketch."))).toBe(false);
+    });
+
+    test("should keep formerly visible commands reachable in some group", () => {
+        const all = DefaultRibbon.flatMap((t) =>
+            t.groups.flatMap((g) => [...flattenItems(g.items), ...(g.collapsedItems ?? [])]),
+        );
+        for (const key of [
+            "create.box",
+            "create.line",
+            "modify.fillet",
+            "boolean.join",
+            "convert.toSolid",
+            "measure.select",
+            "file.import",
+            "test.performance",
+        ]) {
+            expect(all).toContain(key);
         }
     });
 
-    test("groups should support collapsedItems", () => {
-        const drawGroup = DefaultRibbon[0].groups.find((g) => g.groupName === "ribbon.group.draw");
-        expect(drawGroup!.collapsedItems).toBeDefined();
-        expect(Array.isArray(drawGroup!.collapsedItems)).toBe(true);
+    test("file.export should leave the ribbon for the quick commands", () => {
+        const all = DefaultRibbon.flatMap((t) => t.groups.flatMap((g) => flattenItems(g.items)));
+        expect(all).not.toContain("file.export");
     });
 
-    test("all tab names should start with ribbon.tab.", () => {
-        for (const tab of DefaultRibbon) {
-            expect(tab.tabName.startsWith("ribbon.tab.")).toBe(true);
-        }
-    });
-
-    test("all group names should start with ribbon.group.", () => {
-        for (const tab of DefaultRibbon) {
-            for (const group of tab.groups) {
-                expect(group.groupName.startsWith("ribbon.group.")).toBe(true);
-            }
-        }
+    test("SOLID/CREATE should start with the direct sweep and loft without parametric", () => {
+        const create = findGroup(DefaultRibbon, "ribbon.tab.solid", "ribbon.group.create");
+        expect(flattenItems(create.items).slice(0, 2)).toEqual(["create.sweep", "create.loft"]);
     });
 });
 
 describe("SketchRibbonProfiles", () => {
-    test("parametric tab should hold the sketch entry commands", () => {
-        const tab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
-        expect(tab).toBeDefined();
-        expect(tab!.contextual).toBeUndefined();
-        const allItems = flattenItems(tab!.groups.flatMap((g) => g.items));
-        expect(allItems).toEqual(["sketch.create", "sketch.enter"]);
+    test("the contextual sketch tab should end with FINISH SKETCH", () => {
+        const sketchTab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.sketch")!;
+        expect(sketchTab.contextual).toBe(true);
+        expect(sketchTab.groups.map((g) => g.groupName)).toEqual([
+            "ribbon.group.create",
+            "ribbon.group.constraint",
+            "ribbon.group.dimension",
+            "ribbon.group.finish",
+        ]);
+        const finish = sketchTab.groups.at(-1)!;
+        expect(finish.primary).toBe(true);
+        expect(finish.items).toEqual(["sketch.exit"]);
     });
 
-    test("sketch tab should be contextual and contain sketch, draw, constraint, dimension groups", () => {
-        const sketchTab = SketchRibbonProfiles.find((t) => t.tabName === "ribbon.tab.sketch");
-        expect(sketchTab).toBeDefined();
-        expect(sketchTab!.contextual).toBe(true);
-        const groupNames = sketchTab!.groups.map((g) => g.groupName);
-        expect(groupNames).toContain("ribbon.group.sketch");
-        expect(groupNames).toContain("ribbon.group.draw");
-        expect(groupNames).toContain("ribbon.group.constraint");
-        expect(groupNames).toContain("ribbon.group.dimension");
-        const allItems = flattenItems(sketchTab!.groups.flatMap((g) => g.items));
-        expect(allItems).toContain("sketch.exit");
-        expect(allItems).toContain("sketch.line");
-        expect(allItems).toContain("constraint.coincident");
-        expect(allItems).toContain("dimension.distance");
-        expect(allItems).not.toContain("sketch.create");
+    test("constraint group should be icon-only and hold all 13 constraints", () => {
+        const group = findGroup(SketchRibbonProfiles, "ribbon.tab.sketch", "ribbon.group.constraint");
+        expect(group.iconOnly).toBe(true);
+        const items = flattenItems(group.items);
+        expect(items.length).toBe(13);
+        expect(items.every((x) => x.startsWith("constraint."))).toBe(true);
+    });
+
+    test("dimension group should hold the 6 dimensions", () => {
+        const group = findGroup(SketchRibbonProfiles, "ribbon.tab.sketch", "ribbon.group.dimension");
+        const items = flattenItems(group.items);
+        expect(items.length).toBe(6);
+        expect(items.every((x) => x.startsWith("dimension."))).toBe(true);
     });
 });
 
-describe("ParametricRibbonProfiles", () => {
-    test("should contribute the feature group to the parametric tab", () => {
-        const tab = ParametricRibbonProfiles.find((t) => t.tabName === "ribbon.tab.parametric");
-        expect(tab).toBeDefined();
-        expect(tab!.before).toBe("ribbon.tab.manager");
-        const featureGroup = tab!.groups.find((g) => g.groupName === "ribbon.group.feature");
-        expect(featureGroup).toBeDefined();
-        expect(flattenItems(featureGroup!.items)).toContain("feature.extrude");
-    });
-
-    test("should merge into the sketch module's parametric tab without duplicating it", () => {
-        const merged = mergeRibbonProfiles(DefaultRibbon, [
-            ...SketchRibbonProfiles,
-            ...ParametricRibbonProfiles,
-        ]);
-        const parametricTabs = merged.filter((t) => t.tabName === "ribbon.tab.parametric");
-
-        expect(parametricTabs.length).toBe(1);
-        const allItems = flattenItems(parametricTabs[0].groups.flatMap((g) => g.items));
-        expect(allItems).toEqual([
+describe("mergeRibbonProfiles", () => {
+    test("with parametric, SOLID/CREATE should lead with sketch.create then the features", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, parametricExtras);
+        const create = findGroup(merged, "ribbon.tab.solid", "ribbon.group.create");
+        expect(flattenItems(create.items).slice(0, 5)).toEqual([
             "sketch.create",
-            "sketch.enter",
             "feature.extrude",
             "feature.revolve",
+            "create.sweep",
+            "create.loft",
+        ]);
+        expect(create.collapsedItems?.[0]).toBe("sketch.enter");
+    });
+
+    test("with parametric, SOLID/MODIFY should lead with the feature commands", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, parametricExtras);
+        const modify = findGroup(merged, "ribbon.tab.solid", "ribbon.group.modify");
+        expect(flattenItems(modify.items)).toEqual([
             "feature.fillet",
             "feature.chamfer",
             "feature.fuse",
             "feature.cut",
             "feature.common",
-            "feature.variable",
+            "modify.shell",
+            "modify.move",
         ]);
+        expect(modify.collapsedItems?.[0]).toBe("feature.variable");
     });
-});
 
-describe("mergeRibbonProfiles", () => {
-    test("should insert the parametric tab before the manager tab and append the sketch tab", () => {
-        const merged = mergeRibbonProfiles(DefaultRibbon, SketchRibbonProfiles);
-        const tabNames = merged.map((t) => t.tabName);
-
-        expect(tabNames).toEqual([
-            "ribbon.tab.model",
-            "ribbon.tab.parametric",
-            "ribbon.tab.manager",
+    test("should append the contextual sketch tab after the base tabs", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, parametricExtras);
+        expect(merged.map((t) => t.tabName)).toEqual([
+            "ribbon.tab.solid",
+            "ribbon.tab.surface",
+            "ribbon.tab.utilities",
             "ribbon.tab.sketch",
         ]);
     });
 
-    test("should not add sketch commands to the model tab", () => {
-        const merged = mergeRibbonProfiles(DefaultRibbon, SketchRibbonProfiles);
-        const drawGroup = merged
-            .find((t) => t.tabName === "ribbon.tab.model")!
-            .groups.find((g) => g.groupName === "ribbon.group.draw")!;
-
-        expect(flattenItems(drawGroup.items).some((x) => x.startsWith("sketch."))).toBe(false);
+    test("should carry the group flags of a contributed group", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, parametricExtras);
+        expect(findGroup(merged, "ribbon.tab.sketch", "ribbon.group.constraint").iconOnly).toBe(true);
     });
 
     test("should not mutate the base profiles", () => {
-        mergeRibbonProfiles(DefaultRibbon, SketchRibbonProfiles);
+        const before = JSON.stringify(DefaultRibbon);
+        mergeRibbonProfiles(DefaultRibbon, parametricExtras);
+        expect(JSON.stringify(DefaultRibbon)).toBe(before);
+    });
+});
 
-        const allItems = flattenItems(DefaultRibbon.flatMap((t) => t.groups.flatMap((g) => g.items)));
-        expect(allItems.some((x) => x.startsWith("sketch."))).toBe(false);
-        expect(DefaultRibbon.some((t) => t.tabName === "ribbon.tab.sketch")).toBe(false);
+describe("ribbon command keys", () => {
+    test("every ribbon command should have an i18n name", () => {
+        const merged = mergeRibbonProfiles(DefaultRibbon, parametricExtras);
+        const all = merged.flatMap((t) =>
+            t.groups.flatMap((g) => [...flattenItems(g.items), ...(g.collapsedItems ?? [])]),
+        );
+        const missing = all.filter((key) => !I18N_KEYS.includes(`command.${key}` as never));
+        expect(missing).toEqual([]);
     });
 });
 

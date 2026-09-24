@@ -5,12 +5,14 @@ import {
     type CommandIcon,
     type CommandKeys,
     CommandStore,
+    getShortcutText,
     type I18nKeys,
     Localize,
     PubSub,
     type PushButton,
 } from "@chili3d/core";
 import { createIcon, div, label } from "@chili3d/element";
+import style from "./dropdownController.module.css";
 
 export interface DropdownItemData {
     command: CommandKeys;
@@ -56,7 +58,7 @@ export function createDropdownItem(
             className: classes.item,
             onclick: (e) => {
                 e.stopPropagation();
-                PubSub.default.pub("executeCommand", data.command);
+                data.onClick();
                 onSelect();
             },
         },
@@ -65,6 +67,7 @@ export function createDropdownItem(
             className: classes.text,
             textContent: new Localize(data.display),
         }),
+        label({ className: style.shortcut, textContent: getShortcutText(data.command) }),
     );
 }
 

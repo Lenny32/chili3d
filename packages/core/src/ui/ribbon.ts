@@ -26,11 +26,17 @@ export type RibbonGroupProfile = {
     groupName: RibbonGroupKeys;
     items: (RibbonCommand | CommandKeys[])[];
     collapsedItems?: CommandKeys[];
+    /** Render stacked (small) buttons as icons only, e.g. the sketch constraint grid. */
+    iconOnly?: boolean;
+    /** Render the group's buttons in the accent style, e.g. FINISH SKETCH. */
+    primary?: boolean;
 };
 
 export class RibbonGroup extends Observable {
     readonly items: ObservableCollection<RibbonCommand>;
     readonly collapsedItems: ObservableCollection<CommandKeys>;
+    iconOnly = false;
+    primary = false;
 
     get groupName(): RibbonGroupKeys {
         return this.getPrivateValue("groupName");
@@ -50,7 +56,10 @@ export class RibbonGroup extends Observable {
         const mapItems = (items: (RibbonCommand | CommandKeys[])[]) =>
             items.map((item) => (Array.isArray(item) ? new ObservableCollection(...item) : item));
 
-        return new RibbonGroup(profile.groupName, mapItems(profile.items), profile.collapsedItems);
+        const group = new RibbonGroup(profile.groupName, mapItems(profile.items), profile.collapsedItems);
+        group.iconOnly = profile.iconOnly === true;
+        group.primary = profile.primary === true;
+        return group;
     }
 }
 

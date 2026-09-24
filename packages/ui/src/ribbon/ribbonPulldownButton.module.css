@@ -2,15 +2,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     padding: 4px;
     margin: 0 4px;
-    justify-content: flex-start;
     border-radius: 4px;
-    min-width: 42px;
-    max-width: 100px;
-    width: auto;
-    min-height: 48px;
-    height: auto;
+    width: 40px;
+    box-sizing: border-box;
     cursor: default;
     user-select: none;
     position: relative;
@@ -36,17 +33,6 @@
 .pulldownSmall:hover {
     opacity: 0.85;
     background-color: var(--hover-background-color);
-}
-
-.text {
-    color: var(--foreground-color);
-    font-size: 12px;
-    text-align: center;
-    white-space: normal;
-    word-break: break-word;
-    overflow: visible;
-    width: 100%;
-    display: block;
 }
 
 .smallText {

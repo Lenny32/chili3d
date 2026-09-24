@@ -3,7 +3,7 @@
 
 import { Config } from "./config";
 
-export const Navigation3DTypes = ["Chili3d", "Revit", "Blender", "Creo", "Solidworks"] as const;
+export const Navigation3DTypes = ["Chili3d", "Revit", "Blender", "Creo", "Solidworks", "Fusion360"] as const;
 
 export type Navigation3DType = (typeof Navigation3DTypes)[number];
 
@@ -47,6 +47,10 @@ export class Navigation3D {
             ["Solidworks"]: {
                 pan: "Ctrl+Middle",
                 rotate: "Middle",
+            },
+            ["Fusion360"]: {
+                pan: "Middle",
+                rotate: "Shift+Middle",
             },
         } satisfies Record<
             Navigation3DType,

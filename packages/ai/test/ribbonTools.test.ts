@@ -26,7 +26,7 @@ function getTool(name: string) {
 /** A ribbon shaped like the app builds it: a tab with a group of buttons plus an overflow. */
 function buildRibbon(): Ribbon {
     const draw = new RibbonGroup(
-        "ribbon.group.draw" as RibbonGroupKeys,
+        "ribbon.group.create" as RibbonGroupKeys,
         [
             "create.line" as CommandKeys,
             new ObservableCollection("create.rect", "create.circle" as CommandKeys),
@@ -36,7 +36,7 @@ function buildRibbon(): Ribbon {
     const modify = new RibbonGroup("ribbon.group.modify" as RibbonGroupKeys, [
         "modify.fillet" as CommandKeys,
     ]);
-    const model = new RibbonTab("ribbon.tab.model" as RibbonTabKeys, draw, modify);
+    const model = new RibbonTab("ribbon.tab.solid" as RibbonTabKeys, draw, modify);
     const sketch = new RibbonTab("ribbon.tab.sketch" as RibbonTabKeys);
     sketch.contextual = true;
     sketch.visible = false;
@@ -69,18 +69,18 @@ describe("get_ribbon tool", () => {
         const result = JSON.parse((await getTool("get_ribbon").handler({})) as string);
 
         expect(result.available).toBe(true);
-        expect(result.activeTab).toBe("ribbon.tab.model");
+        expect(result.activeTab).toBe("ribbon.tab.solid");
         expect(result.quickCommands).toEqual([
             { label: "command.doc.save", command: "doc.save", hotkey: "Ctrl+S" },
         ]);
         expect(result.tabs.map((tab: { name: string }) => tab.name)).toEqual([
-            "ribbon.tab.model",
+            "ribbon.tab.solid",
             "ribbon.tab.sketch",
         ]);
 
         const [model, sketch] = result.tabs;
         expect(model.groups.map((g: { name: string }) => g.name)).toEqual([
-            "ribbon.group.draw",
+            "ribbon.group.create",
             "ribbon.group.modify",
         ]);
         // A collection is a stack of small buttons: it keeps its shape instead of flattening.
@@ -107,7 +107,7 @@ describe("get_ribbon tool", () => {
         const testLocale = {
             display: "Test",
             language: "test-locale",
-            translation: { "ribbon.tab.model": "MODELL", "command.create.line": "LINIE" },
+            translation: { "ribbon.tab.solid": "MODELL", "command.create.line": "LINIE" },
         } as unknown as Locale;
         try {
             I18n.addLanguage(testLocale);

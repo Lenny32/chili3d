@@ -9,7 +9,7 @@ const DemoPlugin: Plugin = {
     commands: [HelloWorldCommand],
     ribbons: [
         {
-            tabName: "ribbon.tab.manager",
+            tabName: "ribbon.tab.utilities",
             groups: [
                 {
                     groupName: "ribbon.group.other",

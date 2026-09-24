@@ -19,7 +19,6 @@ rs.mock("../src/ribbon/ribbonButton.module.css", () => ({
 rs.mock("../src/ribbon/ribbonPulldownButton.module.css", () => ({
     pulldown: "rpd-pulldown",
     pulldownSmall: "rpd-pulldown-small",
-    text: "rpd-text",
     smallText: "rpd-text-small",
     arrow: "rpd-arrow",
     smallArrow: "rpd-arrow-small",
@@ -54,7 +53,7 @@ describe("RibbonPulldownButton", () => {
     });
 
     describe("rendering", () => {
-        test("should render large pulldown with icon, text and arrow", () => {
+        test("should render large pulldown icon-only with arrow, name in the tooltip", () => {
             const btn = new RibbonPulldownButton(makeData([]), "large");
             expect(btn.className).toBe("rpd-pulldown");
 
@@ -63,9 +62,8 @@ describe("RibbonPulldownButton", () => {
             expect(icon!.getAttribute("icon")).toBe("icon-pulldown");
             expect(icon!.classList.contains("rb-icon")).toBe(true);
 
-            const text = btn.querySelector("label");
-            expect(text).not.toBeNull();
-            expect(text!.className).toBe("rpd-text");
+            expect(btn.querySelector("label")).toBeNull();
+            expect(btn.title).not.toBe("");
 
             expect(btn.querySelector(".rpd-arrow")).not.toBeNull();
         });

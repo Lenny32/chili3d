@@ -1,7 +1,14 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type ButtonSize, Localize, type SplitButton } from "@chili3d/core";
+import {
+    type ButtonSize,
+    getShortcutText,
+    I18n,
+    type I18nKeys,
+    Localize,
+    type SplitButton,
+} from "@chili3d/core";
 import { createIcon, div, label } from "@chili3d/element";
 import { createDropdownItem, DropdownController, getItemData } from "./dropdownController";
 import buttonStyle from "./ribbonButton.module.css";
@@ -12,6 +19,7 @@ export class RibbonSplitButton extends HTMLElement {
     #dropdown = new DropdownController(style.dropdown);
     #iconEl?: Element;
     #textEl?: Element;
+    #mainEl?: HTMLElement;
 
     constructor(
         readonly data: SplitButton,
@@ -31,28 +39,31 @@ export class RibbonSplitButton extends HTMLElement {
         const isLarge = this.size === "large";
         this.className = isLarge ? style.split : style.splitSmall;
 
-        const { icon: iconName, display } = getItemData(this.data.items[0]);
+        const { icon: iconName, display, command } = getItemData(this.data.items[0]);
 
         this.#iconEl = createIcon(iconName);
         this.#iconEl.classList.add(isLarge ? buttonStyle.icon : buttonStyle.smallIcon);
 
-        this.#textEl = label({
-            className: isLarge ? style.text : style.smallText,
-            textContent: new Localize(display),
-        });
+        // large split buttons are icon-only; the name lives in the tooltip
+        if (!isLarge) {
+            this.#textEl = label({ className: style.smallText, textContent: new Localize(display) });
+        }
+
+        this.#mainEl = div(
+            {
+                className: isLarge ? style.mainArea : style.smallMainArea,
+                onclick: (e) => {
+                    e.stopPropagation();
+                    this.executePrimary();
+                },
+            },
+            this.#iconEl,
+            ...(this.#textEl ? [this.#textEl] : []),
+        );
+        this.setTooltip(display, command);
 
         this.append(
-            div(
-                {
-                    className: isLarge ? style.mainArea : style.smallMainArea,
-                    onclick: (e) => {
-                        e.stopPropagation();
-                        this.executePrimary();
-                    },
-                },
-                this.#iconEl,
-                this.#textEl,
-            ),
+            this.#mainEl,
             div(
                 {
                     className: isLarge ? style.arrowButton : style.smallArrowButton,
@@ -106,7 +117,8 @@ export class RibbonSplitButton extends HTMLElement {
         const item = this.data.items[index];
         if (!item) return;
 
-        const { icon: iconName, display } = getItemData(item);
+        const { icon: iconName, display, command } = getItemData(item);
+        this.setTooltip(display, command);
 
         if (this.#iconEl) {
             const newIcon = createIcon(iconName);
@@ -116,13 +128,16 @@ export class RibbonSplitButton extends HTMLElement {
         }
 
         if (this.#textEl) {
-            const newText = label({
-                className: this.size === "large" ? style.text : style.smallText,
-                textContent: new Localize(display),
-            });
+            const newText = label({ className: style.smallText, textContent: new Localize(display) });
             this.#textEl.replaceWith(newText);
             this.#textEl = newText;
         }
+    }
+
+    private setTooltip(display: I18nKeys, command: Parameters<typeof getShortcutText>[0]) {
+        if (!this.#mainEl) return;
+        const shortcut = getShortcutText(command);
+        this.#mainEl.title = shortcut ? `${I18n.translate(display)} (${shortcut})` : I18n.translate(display);
     }
 }
 

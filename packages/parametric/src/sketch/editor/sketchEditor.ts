@@ -132,6 +132,7 @@ export class SketchEditor implements IDisposable {
             const editor = new SketchEditor(node.document, node);
             SketchEditor.activeEditor = editor;
             node.document.application.mainWindow?.ribbon.openTab("ribbon.tab.sketch");
+            PubSub.default.pub("pushShortcutContext", "sketch");
             return editor;
         } catch (error) {
             // The constructor already undid its own session state; this is the flag
@@ -703,6 +704,7 @@ export class SketchEditor implements IDisposable {
             this.node.setShowProfileFaces(true);
             this.setNodeVisibleSilently(this.savedVisible);
             this.node.document.application.mainWindow?.ribbon.closeTab("ribbon.tab.sketch");
+            PubSub.default.pub("popShortcutContext", "sketch");
             this.dispose();
         }
     }

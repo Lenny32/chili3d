@@ -2,14 +2,12 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     padding: 2px;
     margin: 0 4px;
     border-radius: 4px;
-    min-width: 42px;
-    max-width: 100px;
-    width: auto;
-    min-height: 48px;
-    height: auto;
+    width: 40px;
+    box-sizing: border-box;
     cursor: default;
     user-select: none;
     position: relative;
@@ -117,17 +115,6 @@
     border-right: 3px solid transparent;
     border-top: 4px solid var(--foreground-color);
     flex-shrink: 0;
-}
-
-.text {
-    color: var(--foreground-color);
-    font-size: 12px;
-    text-align: center;
-    white-space: normal;
-    word-break: break-word;
-    overflow: visible;
-    width: 100%;
-    display: block;
 }
 
 .smallText {

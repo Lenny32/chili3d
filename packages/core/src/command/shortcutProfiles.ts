@@ -1,10 +1,17 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { Config } from "../config";
 import type { Navigation3DType } from "../navigation";
 import type { CommandKeys } from "./commandKeys";
 
-type ShortcutMap = Partial<Record<CommandKeys, string | string[]>>;
+export type ShortcutMap = Partial<Record<CommandKeys, string | string[]>>;
+
+/** Shortcut layers of a context: `sketch` is active while a sketch is being edited. */
+export type ShortcutContext = "sketch";
+
+/** A profile's global map plus optional context maps that take priority while their context is active. */
+export type ShortcutProfile = { global: ShortcutMap } & Partial<Record<ShortcutContext, ShortcutMap>>;
 
 const MODIFIER_KEYS = new Set(["ctrl", "shift", "alt"]);
 
@@ -108,10 +115,71 @@ export const CreoShortcuts: ShortcutMap = {
     ...DefaultShortcuts,
 };
 
-export const ShortcutProfiles: Record<Navigation3DType, ShortcutMap> = {
-    Chili3d: Chili3dShortcuts,
-    Revit: RevitShortcuts,
-    Blender: BlenderShortcuts,
-    Creo: CreoShortcuts,
-    Solidworks: SolidworksShortcuts,
+export const Fusion360Shortcuts: ShortcutMap = {
+    "doc.save": "ctrl+s",
+    "doc.open": "ctrl+o",
+    "edit.undo": "ctrl+z",
+    "edit.redo": ["ctrl+y", "ctrl+shift+z"],
+    "modify.deleteNode": ["Delete", "Backspace"],
+    "special.last": [" ", "Enter"],
+    "edit.commandSearch": "s",
+    "feature.extrude": ["e", "q"], // Q is Fusion's press pull; the same command covers it
+    "feature.fillet": "f",
+    "modify.move": "m",
+    "measure.length": ["i", "d"],
+    "create.offset": "o",
+    "modify.trim": "t",
+    "modify.paintBucket": "a",
+    "create.line": "l",
+    "create.rect": "r",
+    "create.circle": "c",
 };
+
+export const Fusion360SketchShortcuts: ShortcutMap = {
+    "sketch.line": "l",
+    "sketch.rectangle": "r",
+    "sketch.circle": "c",
+    "dimension.distance": "d",
+    "sketch.projectEdges": "p",
+    "sketch.toggleExternal": "x",
+};
+
+export const ShortcutProfiles: Record<Navigation3DType, ShortcutProfile> = {
+    Chili3d: { global: Chili3dShortcuts },
+    Revit: { global: RevitShortcuts },
+    Blender: { global: BlenderShortcuts },
+    Creo: { global: CreoShortcuts },
+    Solidworks: { global: SolidworksShortcuts },
+    Fusion360: { global: Fusion360Shortcuts, sketch: Fusion360SketchShortcuts },
+};
+
+/** Every map of a profile, context maps first so a context binding wins on lookup. */
+export function shortcutMaps(profile: ShortcutProfile): ShortcutMap[] {
+    const { global, ...contexts } = profile;
+    return [...Object.values(contexts), global];
+}
+
+/**
+ * Raw shortcut specs of a command in the given profile (the active one by default), merging
+ * the global and context maps — a command is bound in at most one of them.
+ */
+export function getShortcutKeys(
+    command: CommandKeys,
+    profile: Navigation3DType = Config.instance.navigation3D,
+): string[] {
+    const entry = ShortcutProfiles[profile];
+    if (entry === undefined) return [];
+    for (const map of shortcutMaps(entry)) {
+        const keys = map[command];
+        if (keys !== undefined) return Array.isArray(keys) ? keys : [keys];
+    }
+    return [];
+}
+
+/** Display form of a command's shortcuts ("Ctrl+Y / Ctrl+Shift+Z"), empty when it has none. */
+export function getShortcutText(
+    command: CommandKeys,
+    profile: Navigation3DType = Config.instance.navigation3D,
+): string {
+    return getShortcutKeys(command, profile).map(formatShortcutKey).join(" / ");
+}

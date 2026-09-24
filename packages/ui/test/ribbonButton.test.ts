@@ -14,6 +14,7 @@ rs.mock("../src/ribbon/ribbonButton.module.css", () => ({
     largeButtonText: "rb-large-text",
     smallButtonText: "rb-small-text",
     checked: "rb-checked",
+    iconOnly: "rb-icon-only",
 }));
 
 // Mock element helpers
@@ -56,18 +57,24 @@ describe("RibbonPushButton", () => {
     });
 
     describe("constructor", () => {
-        test("should render large button with normal class, icon and text", () => {
+        test("should render large button icon-only, name in the tooltip", () => {
             const btn = new RibbonPushButton(PUSH_KEY, "icon-test", "large", () => {});
-            expect(btn.className).toBe("rb-normal");
+            expect(btn.className).toBe("rb-normal rb-icon-only");
 
             const icon = btn.querySelector("svg");
             expect(icon).not.toBeNull();
             expect(icon!.getAttribute("icon")).toBe("icon-test");
             expect(icon!.classList.contains("rb-icon")).toBe(true);
 
-            const text = btn.querySelector("label");
-            expect(text).not.toBeNull();
-            expect(text!.className).toBe("rb-large-text");
+            expect(btn.querySelector("label")).toBeNull();
+            expect(btn.title).toBe(`command.${PUSH_KEY}`);
+        });
+
+        test("should drop the small button's text when iconOnly", () => {
+            const btn = new RibbonPushButton(PUSH_KEY, "icon-test", "small", () => {}, undefined, true);
+            expect(btn.className).toBe("rb-small rb-icon-only");
+            expect(btn.querySelector("svg")).not.toBeNull();
+            expect(btn.querySelector("label")).toBeNull();
         });
 
         test("should render small button with small classes", () => {
@@ -151,7 +158,7 @@ describe("RibbonPushButton", () => {
 
     describe("updateShortcut", () => {
         test("should append shortcut to title and update it on change", () => {
-            const profile = ShortcutProfiles[Config.instance.navigation3D];
+            const profile = ShortcutProfiles[Config.instance.navigation3D].global;
             profile[PUSH_KEY] = "Ctrl+T";
             try {
                 const btn = new RibbonPushButton(PUSH_KEY, "icon-test", "large", () => {});
@@ -167,7 +174,7 @@ describe("RibbonPushButton", () => {
         });
 
         test("should remove shortcut from title when shortcut is cleared", () => {
-            const profile = ShortcutProfiles[Config.instance.navigation3D];
+            const profile = ShortcutProfiles[Config.instance.navigation3D].global;
             profile[PUSH_KEY] = "Ctrl+T";
             try {
                 const btn = new RibbonPushButton(PUSH_KEY, "icon-test", "large", () => {});
@@ -203,12 +210,12 @@ describe("RibbonToggleButton", () => {
 
     test("should reflect checked state in className", () => {
         const { btn } = createToggleButton(true);
-        expect(btn.className).toBe("rb-normal rb-checked");
+        expect(btn.className).toBe("rb-normal rb-icon-only rb-checked");
     });
 
     test("should not have checked class when unchecked", () => {
         const { btn } = createToggleButton(false);
-        expect(btn.className).toBe("rb-normal");
+        expect(btn.className).toBe("rb-normal rb-icon-only");
     });
 
     test("should toggle checked class when bound property changes", () => {

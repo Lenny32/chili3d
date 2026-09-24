@@ -96,7 +96,8 @@ export class AppBuilder {
             // serializers, and exposes the sketch ribbon contributions
             const parametric = await import("@chili3d/parametric");
             await parametric.initPlaneGcs();
-            this._ribbonExtras.push(...parametric.SketchRibbonProfiles, ...ParametricRibbonProfiles);
+            // Sketch last so `sketch.create` lands in front of the feature commands.
+            this._ribbonExtras.push(...ParametricRibbonProfiles, ...parametric.SketchRibbonProfiles);
         });
         return this;
     }

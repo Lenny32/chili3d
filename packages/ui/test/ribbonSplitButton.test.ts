@@ -25,7 +25,6 @@ rs.mock("../src/ribbon/ribbonSplitButton.module.css", () => ({
     smallArrowButton: "rsb-arrow-btn-small",
     arrow: "rsb-arrow",
     smallArrow: "rsb-arrow-small",
-    text: "rsb-text",
     smallText: "rsb-text-small",
     dropdown: "rsb-dropdown",
     dropdownItem: "rsb-dropdown-item",
@@ -91,9 +90,9 @@ describe("RibbonSplitButton", () => {
             expect(icon!.getAttribute("icon")).toBe("icon-a");
             expect(icon!.classList.contains("rb-icon")).toBe(true);
 
-            const text = main.querySelector("label");
-            expect(text).not.toBeNull();
-            expect(text!.className).toBe("rsb-text");
+            // large split buttons are icon-only; the primary item's name is the tooltip
+            expect(main.querySelector("label")).toBeNull();
+            expect(main.title).toContain(CMD_A);
 
             const arrow = arrowButton(btn).querySelector(".rsb-arrow");
             expect(arrow).not.toBeNull();
@@ -202,6 +201,7 @@ describe("RibbonSplitButton", () => {
                 const items = document.body.querySelectorAll(".rsb-dropdown-item");
                 expect(items.length).toBe(2);
                 (items[1] as HTMLElement).click();
+                expect(onClickB).toHaveBeenCalledTimes(1);
 
                 // dropdown closed after selection
                 expect(document.body.querySelector(".rsb-dropdown")).toBeNull();
@@ -213,7 +213,7 @@ describe("RibbonSplitButton", () => {
 
                 // main area now executes item B
                 mainArea(btn).click();
-                expect(onClickB).toHaveBeenCalledTimes(1);
+                expect(onClickB).toHaveBeenCalledTimes(2);
                 expect(onClickA).not.toHaveBeenCalled();
             } finally {
                 btn.dispose();

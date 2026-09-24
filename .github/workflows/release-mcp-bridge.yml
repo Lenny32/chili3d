@@ -1,33 +1,76 @@
 name: Release MCP bridge
 
-# Standalone chili3d-mcp-bridge executables for the release: users download one file and point
-# their MCP client at it, with no Node.js and no checkout. Runs on the version tags pushed by
-# scripts/release.mjs (plain "0.7.1", no "v"); re-run by hand to attach them to an existing tag.
+# Standalone chili3d-mcp-bridge executables: users download one file and point their MCP client at
+# it, with no Node.js and no checkout.
+#
+# - Tag push ("0.7.1", as pushed by scripts/release.mjs): builds that tag, attaches the files to its
+#   GitHub release.
+# - Manual run (Actions > Release MCP bridge > Run workflow): builds any branch, tag or commit with
+#   a version you type, and either only keeps the files as a downloadable run artifact or also
+#   publishes them as a (pre)release. The Run workflow button only exists for workflows on the
+#   default branch.
 
 on:
     push:
         tags: ["[0-9]+.[0-9]+.[0-9]+"]
     workflow_dispatch:
         inputs:
-            tag:
-                description: "Existing release tag to attach the executables to (e.g. 0.7.1)"
+            version:
+                description: "Version to stamp into the executables, e.g. 0.7.2 or 0.7.2-rc.1"
                 required: true
+            ref:
+                description: "Branch, tag or commit SHA to build (empty = the branch chosen above)"
+                required: false
+                default: ""
+            publish:
+                description: "What to do with the files"
+                type: choice
+                default: artifact-only
+                options:
+                    - artifact-only
+                    - prerelease
+                    - release
 
 permissions:
     contents: read
 
 concurrency:
-    group: ${{ github.workflow }}-${{ inputs.tag || github.ref_name }}
+    group: ${{ github.workflow }}-${{ inputs.version || github.ref_name }}
 
 env:
-    TAG: ${{ inputs.tag || github.ref_name }}
+    VERSION: ${{ inputs.version || github.ref_name }}
 
 jobs:
+    prepare:
+        name: Resolve version and commit
+        runs-on: ubuntu-latest
+        outputs:
+            sha: ${{ steps.resolve.outputs.sha }}
+        steps:
+            - name: Check version
+              run: |
+                  if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+                      echo "::error::version must look like 1.2.3 or 1.2.3-rc.1, got '$VERSION'"
+                      exit 1
+                  fi
+
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  ref: ${{ inputs.ref || github.ref }}
+                  persist-credentials: false
+
+            # Every later job builds this exact commit, even if the branch moves meanwhile.
+            - id: resolve
+              run: |
+                  echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+                  echo "Building $(git rev-parse --short HEAD) as $VERSION" >> "$GITHUB_STEP_SUMMARY"
+
     build:
         # Node.js single executable applications: the bundled bridge is injected into each
         # platform's official Node binary. macOS targets are built on macOS, where the script can
         # strip Node's signature before the injection and ad-hoc sign the result.
         name: Build ${{ matrix.name }}
+        needs: prepare
         strategy:
             matrix:
                 include:
@@ -37,7 +80,7 @@ jobs:
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
-                  ref: ${{ env.TAG }}
+                  ref: ${{ needs.prepare.outputs.sha }}
                   persist-credentials: false
 
             - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -46,6 +89,12 @@ jobs:
                   cache: npm
 
             - run: npm ci
+
+            # The executables report this through --version; the npm tarball is named after it.
+            - name: Stamp version
+              run: |
+                  npm pkg set version="$VERSION"
+                  npm pkg set version="$VERSION" --prefix packages/mcp-bridge
 
             - run: node scripts/build-mcp-bridge-binaries.mjs ${{ matrix.targets }}
 
@@ -57,8 +106,7 @@ jobs:
             - uses: actions/upload-artifact@v4
               with:
                   name: build-${{ matrix.name }}
-                  path: |
-                      dist-bridge/chili3d-mcp-bridge-*
+                  path: dist-bridge/chili3d-mcp-bridge-*
                   if-no-files-found: error
 
     verify:
@@ -93,35 +141,54 @@ jobs:
             - name: Smoke test (version + MCP handshake)
               run: |
                   chmod +x "bin/${{ matrix.file }}"
-                  "bin/${{ matrix.file }}" --version
+                  reported=$("bin/${{ matrix.file }}" --version 2>&1)
+                  echo "reports $reported"
+                  test "$reported" = "$VERSION"
                   init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}'
                   reply=$( (echo "$init"; sleep 3) | "bin/${{ matrix.file }}" --app-url https://ci.example/ --port 7777 --token ci | head -n 1)
                   echo "$reply"
                   echo "$reply" | grep -q '"serverInfo":{"name":"chili3d"'
 
-    release:
-        name: Attach to release ${{ inputs.tag || github.ref_name }}
-        needs: verify
+    package:
+        name: Package ${{ inputs.version || github.ref_name }}
+        needs: [prepare, verify]
         runs-on: ubuntu-latest
         permissions:
             contents: write
         steps:
             - uses: actions/download-artifact@v4
               with:
-                  path: artifacts
+                  pattern: build-*
+                  merge-multiple: true
+                  path: release
 
-            # Everything was verified on its own OS by the job above.
-            - name: Collect files
+            - name: Checksums
               run: |
-                  mkdir release
-                  cp artifacts/build-*/chili3d-mcp-bridge-* release/
-                  test "$(ls release | grep -vc '\.tgz$')" -eq 5
+                  count=0
+                  for f in release/chili3d-mcp-bridge-*; do [[ "$f" == *.tgz ]] || count=$((count + 1)); done
+                  test "$count" -eq 5
                   cd release && sha256sum chili3d-mcp-bridge-* > SHA256SUMS && cat SHA256SUMS
 
-            - name: Upload
+            # Always available from the run's summary page, whatever "publish" says.
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: chili3d-mcp-bridge-${{ env.VERSION }}
+                  path: release/
+                  if-no-files-found: error
+
+            - name: Publish to GitHub release
+              if: github.event_name == 'push' || inputs.publish != 'artifact-only'
               env:
                   GH_TOKEN: ${{ github.token }}
                   GH_REPO: ${{ github.repository }}
+                  SHA: ${{ needs.prepare.outputs.sha }}
+                  PRERELEASE: ${{ inputs.publish == 'prerelease' }}
               run: |
-                  gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --generate-notes
-                  gh release upload "$TAG" release/* --clobber
+                  # A tag push already has its tag; a manual run creates "$VERSION" at the built commit.
+                  flags=(--target "$SHA" --title "$VERSION" --generate-notes)
+                  [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+                  if ! gh release view "$VERSION" >/dev/null 2>&1; then
+                      gh release create "$VERSION" "${flags[@]}"
+                  fi
+                  gh release upload "$VERSION" release/* --clobber
+                  echo "Published to $(gh release view "$VERSION" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"

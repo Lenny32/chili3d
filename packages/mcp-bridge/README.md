@@ -71,7 +71,12 @@ Chrome, Edge and Firefox connect from both local and hosted pages. When the page
 
 ## Releases
 
-`.github/workflows/release-mcp-bridge.yml` runs on every version tag: it builds the five executables as Node.js single executable applications (`scripts/build-mcp-bridge-binaries.mjs`: esbuild bundle injected with postject into each platform's official, checksum-verified Node binary), test-runs each one on its real OS (ad-hoc signing the macOS ones), and attaches them, `SHA256SUMS` and the npm tarball to the GitHub release. The panel links `https://github.com/lenny32/chili3d/releases/download/<version>/`; a fork that publishes its own releases builds the site with `CHILI3D_BRIDGE_DOWNLOAD_URL=<its folder URL>/`.
+`.github/workflows/release-mcp-bridge.yml` builds the five executables as Node.js single executable applications (`scripts/build-mcp-bridge-binaries.mjs`: esbuild bundle injected with postject into each platform's official, checksum-verified Node binary), test-runs each one on its real OS, and packages them with `SHA256SUMS` and the npm tarball.
+
+- **Tag push** (`npm run release 0.7.2` pushes the tag): builds the tag and attaches the files to its GitHub release.
+- **Manual run**: *Actions > Release MCP bridge > Run workflow* (or `gh workflow run release-mcp-bridge.yml -f version=0.7.2-rc.1 -f ref=feature/x -f publish=artifact-only`). Pick the version to stamp, the branch/tag/commit to build, and whether to only keep a run artifact, or publish a prerelease or release (created at the built commit). The button appears once the workflow is on the default branch.
+
+The panel links `https://github.com/lenny32/chili3d/releases/download/<version>/`; a fork that publishes its own releases builds the site with `CHILI3D_BRIDGE_DOWNLOAD_URL=<its folder URL>/`.
 
 ## Developing
 

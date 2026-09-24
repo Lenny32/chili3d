@@ -26,35 +26,32 @@ afterAll(() => {
     rs.unstubAllGlobals();
 });
 
-test.each([Plane.XY, Plane.YZ])(
-    "spline and closing line form a profile with stable entity identity on %j",
-    (plane) => {
-        const params = splineParams([
-            [0, 0],
-            [5, 5],
-            [10, 0],
-        ]);
-        expect(params.isOk).toBe(true);
-        const node = new SketchNode({
-            document: createMockDocument(),
-            plane,
-            data: {
-                entities: [
-                    { id: 1, type: "spline", params: params.value },
-                    { id: 2, type: "line", params: [10, 0, 0, 0] },
-                ],
-                constraints: [],
-            },
-        });
-        const shape = node.generateShape();
-        expect(shape.isOk).toBe(true);
-        expect(shape.value.findSubShapes(ShapeTypes.edge)).toHaveLength(3);
-        expect(shapeEntityIds(node.data)).toEqual([1, 1, 2]);
-        expect(sourceEntityIds([0, 1, 2], shapeEntityIds(node.data), node)).toEqual([1, 2]);
-        expect(shape.value.edgesMeshPosition().position.length).toBeGreaterThan(18);
-        const profiles = sketchProfiles(node);
-        expect(profiles.isOk).toBe(true);
-        expect(profiles.value.outer).toHaveLength(1);
-        expect(profiles.value.outerEntities).toEqual([[1, 2]]);
-    },
-);
+test.each([Plane.XY, Plane.YZ])("spline profiles preserve entity identity on %j", (plane) => {
+    const params = splineParams([
+        [0, 0],
+        [5, 5],
+        [10, 0],
+    ]);
+    expect(params.isOk).toBe(true);
+    const node = new SketchNode({
+        document: createMockDocument(),
+        plane,
+        data: {
+            entities: [
+                { id: 1, type: "spline", params: params.value },
+                { id: 2, type: "line", params: [10, 0, 0, 0] },
+            ],
+            constraints: [],
+        },
+    });
+    const shape = node.generateShape();
+    expect(shape.isOk).toBe(true);
+    expect(shape.value.findSubShapes(ShapeTypes.edge)).toHaveLength(3);
+    expect(shapeEntityIds(node.data)).toEqual([1, 1, 2]);
+    expect(sourceEntityIds([0, 1, 2], shapeEntityIds(node.data), node)).toEqual([1, 2]);
+    expect(shape.value.edgesMeshPosition().position.length).toBeGreaterThan(18);
+    const profiles = sketchProfiles(node);
+    expect(profiles.isOk).toBe(true);
+    expect(profiles.value.outer).toHaveLength(1);
+    expect(profiles.value.outerEntities).toEqual([[1, 2]]);
+});

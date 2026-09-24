@@ -488,6 +488,7 @@ export const I18N_KEYS = [
     "viewport.perspective",
     "viewport.zoomIn",
     "viewport.zoomOut",
+    "viewport.grid",
     "viewport.mode.solid",
     "viewport.mode.wireframe",
     "viewport.mode.solidAndWireframe",

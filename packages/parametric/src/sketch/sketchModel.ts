@@ -24,22 +24,27 @@ export const SKETCH_EDGE_LINE_WIDTH = 2;
 /** Profile faces are shaded translucent so a sketch reads as curves, not a solid disc. */
 export const SKETCH_PROFILE_OPACITY = 0.2;
 
-export type SketchEntityType = "line" | "circle" | "arc";
+export type SketchEntityType = "line" | "circle" | "arc" | "point" | "ellipse";
 
 /**
  * line: params = [x1, y1, x2, y2]; circle: params = [cx, cy, r];
  * arc: params = [cx, cy, sx, sy, ex, ey] (center, start, end; radius = ‖s−c‖,
  * counter-clockwise sweep from start to end) — all in sketch (u, v) coordinates.
+ * point: [x, y]; ellipse: [cx, cy, ax, ay, bx, by] (center and two
+ * perpendicular axis endpoints; radii are the distances from the center).
  */
 export interface SketchEntityData {
     id: number;
     type: SketchEntityType;
     params: number[];
+    /** Construction geometry is editable but never contributes profile edges. */
+    construction?: boolean;
 }
 
 /**
  * line: pointIndex 0 = start, 1 = end; circle: pointIndex 0 = center;
  * arc: pointIndex 0 = center, 1 = start, 2 = end.
+ * point: pointIndex 0 = location; ellipse: 0 = center, 1/2 = axis endpoints.
  */
 export interface SketchPointRef {
     entityId: number;
@@ -47,7 +52,13 @@ export interface SketchPointRef {
 }
 
 /** Addressable points per entity type (the `pointIndex` layout of `SketchPointRef`). */
-const ENTITY_POINT_COUNTS: Record<SketchEntityType, number> = { circle: 1, line: 2, arc: 3 };
+const ENTITY_POINT_COUNTS: Record<SketchEntityType, number> = {
+    circle: 1,
+    line: 2,
+    arc: 3,
+    point: 1,
+    ellipse: 3,
+};
 
 /** Number of point refs an entity of `type` exposes (`pointIndex` runs 0..n−1). */
 export function entityPointCount(type: SketchEntityType): number {
@@ -286,7 +297,23 @@ export function profileExternalRefs(data: SketchData): ExternalRefData[] {
  * the kernel's source edge indexes through this list on the crossing path.
  */
 export function shapeEntityIds(data: SketchData): number[] {
-    return [...data.entities.map((entity) => entity.id), ...profileExternalRefs(data).map((r) => r.entityId)];
+    return [
+        ...data.entities.filter(isProfileEntity).map((entity) => entity.id),
+        ...profileExternalRefs(data).map((r) => r.entityId),
+    ];
+}
+
+export function isProfileEntity(entity: SketchEntityData): boolean {
+    return entity.type !== "point" && !entity.construction;
+}
+
+/** Ellipse params: center, first axis endpoint, second axis endpoint (perpendicular). */
+export function ellipsePoint(params: readonly number[], angle: number): [number, number] {
+    const [cx, cy, ax, ay, bx, by] = params;
+    return [
+        cx + (ax - cx) * Math.cos(angle) + (bx - cx) * Math.sin(angle),
+        cy + (ay - cy) * Math.cos(angle) + (by - cy) * Math.sin(angle),
+    ];
 }
 
 /** Point ref of the sketch origin (0, 0). */

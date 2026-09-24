@@ -5,8 +5,11 @@ import { Plane, PubSub, XYZ } from "@chili3d/core";
 import { rs } from "@rstest/core";
 import { SketchArcCommand } from "../../src/sketch/commands/sketchArc";
 import { SketchCircleCommand } from "../../src/sketch/commands/sketchCircle";
+import { SketchEllipseCommand } from "../../src/sketch/commands/sketchEllipse";
 import { SketchLineCommand } from "../../src/sketch/commands/sketchLine";
+import { SketchPointCommand } from "../../src/sketch/commands/sketchPoint";
 import type { SketchPointSnapData } from "../../src/sketch/commands/sketchPointStep";
+import { SketchPolygonCommand } from "../../src/sketch/commands/sketchPolygon";
 import { SketchRectangleCommand } from "../../src/sketch/commands/sketchRectangle";
 import { SketchEditor } from "../../src/sketch/editor/sketchEditor";
 import { ConstraintKind, originRef } from "../../src/sketch/sketchModel";
@@ -25,6 +28,99 @@ function fakeEditor() {
 }
 
 type FakeEditor = ReturnType<typeof fakeEditor>;
+
+describe("foundation drawing commands", () => {
+    test.each([
+        { command: () => new SketchPointCommand(), points: [[0.1, 0.1]], type: "point", count: 1 },
+        {
+            command: () => new SketchEllipseCommand(),
+            points: [
+                [0.1, 0.1],
+                [10, 0.1],
+                [0.1, 5],
+            ],
+            type: "ellipse",
+            count: 1,
+        },
+        {
+            command: () => new SketchPolygonCommand(),
+            points: [
+                [0.1, 0.1],
+                [10, 0.1],
+            ],
+            type: "circle",
+            count: 7,
+        },
+    ])("$type creation snaps its center and commits once", ({ command, points, type, count }) => {
+        const editor = fakeEditor();
+        try {
+            editor.screenTolerance = () => 0.5;
+            runCommand(command(), editor, points as [number, number][]);
+            expect(editor.solver.entities()).toHaveLength(count);
+            expect(editor.solver.entities()[0].type).toBe(type);
+            expect(editor.solver.pointOf({ entityId: 1, pointIndex: 0 })).toEqual([0, 0]);
+            expect(editor.solver.toData().constraints).toContainEqual({
+                id: expect.any(Number),
+                kind: ConstraintKind.P2PCoincident,
+                refs: [{ entityId: 1, pointIndex: 0 }, originRef()],
+            });
+            expect(editor.solve).toHaveBeenCalledWith(true);
+            expect(editor.commit).toHaveBeenCalledTimes(1);
+            expect(editor.solver.solve(true).result).toMatch(/^Ok/);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test("ellipse focal mode uses two foci and a rim point", () => {
+        const editor = fakeEditor();
+        try {
+            const command = new SketchEllipseCommand();
+            command.foci = true;
+            runCommand(command, editor, [
+                [-4, 0],
+                [4, 0],
+                [0, 3],
+            ]);
+            expect(editor.solver.entities()).toEqual([
+                { id: 1, type: "ellipse", params: [0, 0, 5, 0, 0, 3] },
+            ]);
+            expect(editor.commit).toHaveBeenCalledTimes(1);
+        } finally {
+            editor.solver.dispose();
+        }
+    });
+
+    test.each([
+        {
+            command: () => new SketchPolygonCommand(),
+            points: [
+                [2, 3],
+                [2, 3],
+            ],
+        },
+        {
+            command: () => new SketchEllipseCommand(),
+            points: [
+                [0, 0],
+                [5, 0],
+                [5, 0],
+            ],
+        },
+    ])("invalid creation reports an error without committing", ({ command, points }) => {
+        const editor = fakeEditor();
+        const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});
+        try {
+            runCommand(command(), editor, points as [number, number][]);
+            expect(editor.solver.entities()).toEqual([]);
+            expect(editor.commit).not.toHaveBeenCalled();
+            expect(pub).toHaveBeenCalledWith("displayError", expect.any(String));
+        } finally {
+            pub.mockRestore();
+            editor.solver.dispose();
+        }
+    });
+});
 
 /** Drives executeMainTask directly with canned step points on the XY plane. */
 function runCommand(command: object, editor: FakeEditor, points: [number, number][]) {

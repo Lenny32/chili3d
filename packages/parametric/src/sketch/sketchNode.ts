@@ -28,6 +28,7 @@ import { type PlaneFaceRef, resolveFacePlane } from "./planeRef";
 import {
     arcAngles,
     type ExternalRefData,
+    isProfileEntity,
     profileExternalRefs,
     rawArcSweep,
     SKETCH_EDGE_LINE_WIDTH,
@@ -231,6 +232,7 @@ export class SketchNode extends ParameterShapeNode {
     private buildEdges(data: SketchData): Result<IEdge[]> {
         const edges: IEdge[] = [];
         for (const entity of data.entities) {
+            if (!isProfileEntity(entity)) continue;
             const edge = this.entityEdge(entity);
             if (!edge.isOk) return Result.err(edge.error);
             edges.push(edge.value);
@@ -249,6 +251,25 @@ export class SketchNode extends ParameterShapeNode {
     private entityEdge(entity: SketchEntityData): Result<IEdge> {
         const p = entity.params;
         switch (entity.type) {
+            case "point":
+                return Result.err("Points do not produce profile edges");
+            case "ellipse": {
+                const center = toWorld(this.plane, p[0], p[1]);
+                const a = toWorld(this.plane, p[2], p[3]).sub(center);
+                const b = toWorld(this.plane, p[4], p[5]).sub(center);
+                const ra = a.length();
+                const rb = b.length();
+                if (!Number.isFinite(ra + rb) || Math.min(ra, rb) < Precision.Distance) {
+                    return Result.err("Ellipse radii are too small");
+                }
+                return shapeFactory.ellipse(
+                    this.plane.normal,
+                    center,
+                    ra >= rb ? a : b,
+                    Math.max(ra, rb),
+                    Math.min(ra, rb),
+                );
+            }
             case "line":
                 return shapeFactory.line(toWorld(this.plane, p[0], p[1]), toWorld(this.plane, p[2], p[3]));
             case "circle":

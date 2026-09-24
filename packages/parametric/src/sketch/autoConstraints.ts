@@ -422,7 +422,7 @@ function nearestCurveSnap(
 ): DragSnap | undefined {
     let nearest: { distance: number; snap: DragSnap } | undefined;
     for (const entity of entities) {
-        if (excludeEntityIds?.has(entity.id) || entity.type === "line") continue;
+        if (excludeEntityIds?.has(entity.id) || (entity.type !== "circle" && entity.type !== "arc")) continue;
         const projection = projectOntoEntity(entity, probe);
         if (projection === undefined || projection.distance >= tolerance) continue;
         if (nearest !== undefined && projection.distance >= nearest.distance) continue;

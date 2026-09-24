@@ -117,6 +117,7 @@ export class SketchSolver implements ExternalEntityHost {
     system: SolverSystem;
     /** Entity tables holding real AND external entities (externals under reserved negative ids). */
     private readonly entityTypes = new Map<number, SketchEntityType>();
+    private readonly constructionEntities = new Set<number>();
     private readonly entityParams = new Map<number, number[]>();
     private readonly entityCache = new Map<number, number[]>();
     private readonly constraints = new Map<number, ConstraintRecord>();
@@ -229,6 +230,25 @@ export class SketchSolver implements ExternalEntityHost {
         return this.registerEntity("line", this.addEntityParams("line", [x1, y1, x2, y2]));
     }
 
+    addPoint(x: number, y: number): number {
+        return this.registerEntity("point", this.addEntityParams("point", [x, y]));
+    }
+
+    /** Exact ellipse: center and two perpendicular axis endpoints, all addressable. */
+    addEllipse(cx: number, cy: number, ax: number, ay: number, bx: number, by: number): number {
+        const id = this.registerEntity("ellipse", this.addEntityParams("ellipse", [cx, cy, ax, ay, bx, by]));
+        this.addConstraint({
+            kind: ConstraintKind.Perpendicular,
+            refs: [0, 1, 0, 2].map((pointIndex) => ({ entityId: id, pointIndex })),
+        });
+        return id;
+    }
+
+    setConstruction(entityId: number, construction: boolean): void {
+        if (construction) this.constructionEntities.add(entityId);
+        else this.constructionEntities.delete(entityId);
+    }
+
     addCircle(cx: number, cy: number, r: number): number {
         return this.registerEntity("circle", this.addEntityParams("circle", [cx, cy, r]));
     }
@@ -290,6 +310,7 @@ export class SketchSolver implements ExternalEntityHost {
             this.system.remove_param(paramId);
         }
         this.entityTypes.delete(id);
+        this.constructionEntities.delete(id);
         this.entityParams.delete(id);
         this.entityCache.delete(id);
         return removedConstraints;
@@ -503,6 +524,7 @@ export class SketchSolver implements ExternalEntityHost {
                 id,
                 type: this.entityTypes.get(id)!,
                 params: [...params],
+                ...(this.constructionEntities.has(id) ? { construction: true } : {}),
             }));
     }
 
@@ -511,7 +533,14 @@ export class SketchSolver implements ExternalEntityHost {
         if (id === SKETCH_X_AXIS_ID || id === SKETCH_Y_AXIS_ID) return datumEntityData(id);
         const type = this.entityTypes.get(id);
         const params = this.entityCache.get(id);
-        return type === undefined || params === undefined ? undefined : { id, type, params: [...params] };
+        return type === undefined || params === undefined
+            ? undefined
+            : {
+                  id,
+                  type,
+                  params: [...params],
+                  ...(this.constructionEntities.has(id) ? { construction: true } : {}),
+              };
     }
 
     pointOf(ref: SketchPointRef): [number, number] {
@@ -691,6 +720,7 @@ export class SketchSolver implements ExternalEntityHost {
         this.system.free();
         this.system = newSolverSystem();
         this.entityTypes.clear();
+        this.constructionEntities.clear();
         this.entityParams.clear();
         this.entityCache.clear();
         this.constraints.clear();
@@ -922,9 +952,13 @@ export class SketchSolver implements ExternalEntityHost {
             case ConstraintKind.Midpoint:
                 return [...this.pointParams(refs[0]), ...this.lineParams(refs[1], refs[2])];
             case ConstraintKind.Parallel:
-            case ConstraintKind.Perpendicular:
             case ConstraintKind.EqualLength:
                 return this.twoLineParams(refs);
+            case ConstraintKind.Perpendicular:
+                return refs.every((ref) => ref.entityId === refs[0].entityId) &&
+                    this.typeOf(refs[0].entityId) === "ellipse"
+                    ? this.pointParams(...refs)
+                    : this.twoLineParams(refs);
             case ConstraintKind.Symmetric:
                 return [...this.pointParams(refs[0], refs[1]), ...this.lineParams(refs[2], refs[3])];
             case ConstraintKind.EqualRadius:
@@ -1154,10 +1188,10 @@ export class SketchSolver implements ExternalEntityHost {
         if (type === "line" && (ref.pointIndex === 0 || ref.pointIndex === 1)) {
             return [ref.pointIndex * 2, ref.pointIndex * 2 + 1];
         }
-        if (type === "arc" && ref.pointIndex >= 0 && ref.pointIndex <= 2) {
+        if ((type === "arc" || type === "ellipse") && ref.pointIndex >= 0 && ref.pointIndex <= 2) {
             return [ref.pointIndex * 2, ref.pointIndex * 2 + 1];
         }
-        if (type === "circle" && ref.pointIndex === 0) {
+        if ((type === "circle" || type === "point") && ref.pointIndex === 0) {
             return [0, 1];
         }
         throw new Error(`Invalid point ref ${ref.entityId}:${ref.pointIndex}`);
@@ -1243,6 +1277,7 @@ export class SketchSolver implements ExternalEntityHost {
         }
         for (const entity of data.entities) {
             this.registerEntity(entity.type, this.addEntityParams(entity.type, entity.params), entity.id);
+            if (entity.construction) this.constructionEntities.add(entity.id);
         }
         for (const constraint of data.constraints) {
             this.addConstraintWithId(constraint.id, constraint);

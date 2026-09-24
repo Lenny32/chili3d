@@ -19,6 +19,7 @@ import {
 } from "@chili3d/core";
 import type { ParametricBodyNode } from "../../parametricBodyNode";
 import type { GeometryEdit } from "../geometryEditing";
+import type { SketchClipboard } from "../sketchModel";
 import {
     ConstraintKind,
     datumUnitSpec,
@@ -31,6 +32,7 @@ import {
 import type { SketchNode } from "../sketchNode";
 import { computeSketchRollback, rollbackRestoreOrder } from "../sketchRollback";
 import { SketchSolver, type SolveOutcome } from "../solver";
+import type { SketchTransform } from "../utilityOperations";
 import * as datumPrompt from "./datumPrompt";
 import { type DimensionAnchor, toDisplayDatum, toStorageDatum } from "./dimensionLayout";
 import { SketchAnnotationManager } from "./sketchAnnotations";
@@ -547,6 +549,39 @@ export class SketchEditor implements IDisposable {
         for (const id of result.value.removedConstraints) this.dimensionAnchors.delete(id);
         this.annotations.deselectConstraints(result.value.removedConstraints);
         this.annotations.setHighlightedEntities([]);
+        this.commit();
+        return true;
+    }
+
+    get selectedEntityIds(): number[] {
+        return this.eventHandler.selectedEntityIds;
+    }
+
+    applyTransform(
+        ids: readonly number[],
+        transform: SketchTransform,
+        clipboard?: SketchClipboard,
+        copy = false,
+    ): boolean {
+        if (this.disposed) return false;
+        const before = this.solver.toData();
+        const result = this.solver.applyTransform(ids, transform, clipboard, copy);
+        if (!result.isOk) {
+            PubSub.default.pub("displayError", result.error);
+            return false;
+        }
+        const outcome = this.solve(true);
+        if (!outcome.result.startsWith("Ok")) {
+            this.solver.reset(before);
+            this.annotations.refresh();
+            PubSub.default.pub("displayError", "The transform conflicts with existing constraints");
+            return false;
+        }
+        const retained = new Set(this.solver.toData().constraints.map((c) => c.id));
+        const removed = before.constraints.filter((c) => !retained.has(c.id)).map((c) => c.id);
+        for (const id of removed) this.dimensionAnchors.delete(id);
+        this.annotations.deselectConstraints(removed);
+        this.eventHandler.selectEntities(result.value);
         this.commit();
         return true;
     }

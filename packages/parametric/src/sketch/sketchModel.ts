@@ -79,6 +79,8 @@ export interface SketchConstraintData {
     datum?: ParameterValue;
     /** Datum values for multi-datum kinds (Fix = [x, y]); mutually exclusive with `datum`. */
     datums?: ParameterValue[];
+    /** Transformed axis for horizontal/vertical relations and projected dimensions. Unit vector in UV. */
+    direction?: [number, number];
 }
 
 /**
@@ -217,6 +219,13 @@ export interface SketchData {
      * where the solver initializes it from the current min external id − 1.
      */
     externalIdSeq?: number;
+}
+
+/** Detached, sketch-agnostic clipboard; only relationships wholly inside the selection travel. */
+export interface SketchClipboard {
+    entities: SketchEntityData[];
+    constraints: SketchConstraintData[];
+    origin: [number, number];
 }
 
 export function emptySketchData(): SketchData {

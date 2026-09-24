@@ -38,6 +38,7 @@ import {
     worldPerPixel,
 } from "../sketchModel";
 import { constraintTargetEntities } from "../solverEntities";
+import { sampleSpline } from "../splineGeometry";
 import { applyConstraintIcon, type BadgeSymbol, badgeSymbol, isBadgeEventTarget } from "./sketchAnnotations";
 import style from "./sketchAnnotations.module.css";
 import type { SketchEditor, SketchEntityTypeFilter } from "./sketchEditor";
@@ -777,7 +778,16 @@ export function sketchEntityMesh(
     }
     if (entity.construction) lineType = "dash";
     let mesh: EdgeMeshData;
-    if (entity.type === "ellipse") {
+    if (entity.type === "spline") {
+        const points = sampleSpline(entity.params).map((p) => toWorld(plane, ...p));
+        const position = new Float32Array((points.length - 1) * 6);
+        for (let i = 0; i < points.length - 1; i++) {
+            const a = points[i];
+            const b = points[i + 1];
+            position.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6);
+        }
+        mesh = { position, range: [], color, lineType };
+    } else if (entity.type === "ellipse") {
         const position = new Float32Array(CIRCLE_SEGMENTS * 6);
         for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
             const a = toWorld(plane, ...ellipsePoint(entity.params, (i * Math.PI * 2) / CIRCLE_SEGMENTS));
@@ -857,6 +867,14 @@ function arcSegmentMesh(
 
 /** uv distance to an entity's curve: segment, arc sweep, or circle circumference. */
 export function entityDistance(uv: [number, number], entity: SketchEntityData): number {
+    if (entity.type === "spline") {
+        const points = sampleSpline(entity.params);
+        let distance = Number.POSITIVE_INFINITY;
+        for (let i = 1; i < points.length; i++) {
+            distance = Math.min(distance, pointToSegmentDistance(...uv, ...points[i - 1], ...points[i]));
+        }
+        return distance;
+    }
     const [x1, y1, x2, y2] = entity.params;
     if (entity.type === "point") return Math.hypot(uv[0] - x1, uv[1] - y1);
     if (entity.type === "ellipse") {

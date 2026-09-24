@@ -24,7 +24,7 @@ export const SKETCH_EDGE_LINE_WIDTH = 2;
 /** Profile faces are shaded translucent so a sketch reads as curves, not a solid disc. */
 export const SKETCH_PROFILE_OPACITY = 0.2;
 
-export type SketchEntityType = "line" | "circle" | "arc" | "point" | "ellipse";
+export type SketchEntityType = "line" | "circle" | "arc" | "point" | "ellipse" | "spline";
 
 /**
  * line: params = [x1, y1, x2, y2]; circle: params = [cx, cy, r];
@@ -32,6 +32,7 @@ export type SketchEntityType = "line" | "circle" | "arc" | "point" | "ellipse";
  * counter-clockwise sweep from start to end) — all in sketch (u, v) coordinates.
  * point: [x, y]; ellipse: [cx, cy, ax, ay, bx, by] (center and two
  * perpendicular axis endpoints; radii are the distances from the center).
+ * spline: [sx, sy, ex, ey, ...fixedInteriorPoints] (open Catmull–Rom interpolation).
  */
 export interface SketchEntityData {
     id: number;
@@ -44,6 +45,7 @@ export interface SketchEntityData {
 /**
  * line: pointIndex 0 = start, 1 = end; circle: pointIndex 0 = center;
  * arc: pointIndex 0 = center, 1 = start, 2 = end.
+ * spline: pointIndex 0 = start, 1 = end; interior points are not solver parameters.
  * point: pointIndex 0 = location; ellipse: 0 = center, 1/2 = axis endpoints.
  */
 export interface SketchPointRef {
@@ -58,6 +60,7 @@ const ENTITY_POINT_COUNTS: Record<SketchEntityType, number> = {
     arc: 3,
     point: 1,
     ellipse: 3,
+    spline: 2,
 };
 
 /** Number of point refs an entity of `type` exposes (`pointIndex` runs 0..n−1). */
@@ -298,7 +301,14 @@ export function profileExternalRefs(data: SketchData): ExternalRefData[] {
  */
 export function shapeEntityIds(data: SketchData): number[] {
     return [
-        ...data.entities.filter(isProfileEntity).map((entity) => entity.id),
+        ...data.entities
+            .filter(isProfileEntity)
+            .flatMap(
+                (entity) =>
+                    Array(entity.type === "spline" ? entity.params.length / 2 - 1 : 1).fill(
+                        entity.id,
+                    ) as number[],
+            ),
         ...profileExternalRefs(data).map((r) => r.entityId),
     ];
 }

@@ -31,7 +31,7 @@ import { INCIDENCE_TOLERANCE } from "./refGeometry";
 /**
  * Makes a missing entity id loud, in the spirit of `reportSilentIdLoss`
  * (features/idDiagnostics.ts): the edge list and the entity-id list are parallel on
- * every healthy path (generateShape builds one edge per entity, then the
+ * every healthy path (generateShape builds one or more edges per entity, then the
  * profile-role external refs), so a miss means the kernel's source report and the
  * sketch have diverged. Silently stuffing undefined into a region's identity set
  * would degrade its ProfileRef to geometric matching only after a serialization
@@ -44,7 +44,7 @@ export function reportMissingEntityId(sketch: SketchNode, what: string): void {
 }
 
 /**
- * Input edge i corresponds to shapeEntityIds[i] (generateShape combines one edge
+ * Input edge i corresponds to shapeEntityIds[i] (generateShape combines all edges
  * per entity in `data.entities` order, then the profile-role external refs) — map
  * the kernel's source indexes to the entity ids, which survive endpoint drags and
  * re-splits. An index outside the entity list would stuff undefined into the
@@ -56,7 +56,7 @@ export function sourceEntityIds(
     entityIds: readonly (number | undefined)[],
     sketch: SketchNode,
 ): number[] {
-    return sourceIndexes
+    const ids = sourceIndexes
         .flatMap((index) => {
             if (index < 0 || index >= entityIds.length) {
                 reportMissingEntityId(
@@ -69,6 +69,8 @@ export function sourceEntityIds(
             return id === undefined ? [] : [id];
         })
         .sort((a, b) => a - b);
+    // A spline contributes several cubic edges, all owned by the same entity.
+    return [...new Set(ids)];
 }
 
 /** A region's boundary edges are pieces the splitter cut from its source edges. */

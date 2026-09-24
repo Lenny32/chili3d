@@ -70,7 +70,7 @@ export function sketchProfiles(sketch: SketchNode): Result<SketchProfileSet> {
     if (edges.length === 0) return Result.err("Sketch has no entities");
 
     // Edge i was generated from sketch entity shapeEntityIds[i] (generateShape combines
-    // one edge per entity, then the profile-role external refs) — the entity ids survive
+    // each entity's edges, then the profile-role external refs) — the entity ids survive
     // endpoint drags and re-splits, unlike edge positions.
     const entityIds = shapeEntityIds(sketch.data);
     const idByEdge = new Map(edges.map((edge, index) => [edge, entityIds[index]]));

@@ -30,6 +30,8 @@ export function commonRspackOptions(overrides?: RspackOptions): RspackOptions {
             parser: {
                 "css/auto": {
                     namedExports: false,
+                    // Keep shared theme variables consistent with the host application.
+                    dashedIdents: false,
                 },
             },
             rules: [

@@ -84,6 +84,7 @@ describe("SketchRibbonProfiles", () => {
         expect(sketchTab.contextual).toBe(true);
         expect(sketchTab.groups.map((g) => g.groupName)).toEqual([
             "ribbon.group.create",
+            "ribbon.group.modify",
             "ribbon.group.constraint",
             "ribbon.group.dimension",
             "ribbon.group.finish",
@@ -91,6 +92,7 @@ describe("SketchRibbonProfiles", () => {
         const finish = sketchTab.groups.at(-1)!;
         expect(finish.primary).toBe(true);
         expect(finish.items).toEqual(["sketch.exit"]);
+        expect(flattenItems(sketchTab.groups[0].items)).toContain("sketch.spline");
     });
 
     test("constraint group should be icon-only and hold all 13 constraints", () => {

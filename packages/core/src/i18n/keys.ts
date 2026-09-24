@@ -197,6 +197,8 @@ export const I18N_KEYS = [
     "command.sketch.circle",
     "command.sketch.polygon",
     "command.sketch.ellipse",
+    "command.sketch.spline",
+    "prompt.pickSplinePoint",
     "command.sketch.point",
     "sketch.polygon.inscribed",
     "sketch.ellipse.foci",

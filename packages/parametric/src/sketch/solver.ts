@@ -34,6 +34,7 @@ import {
     syncExternalRoles,
     toDatumSource,
 } from "./sketchModel";
+import { type SplinePoint, splineParams } from "./splineGeometry";
 
 function findRoot(parent: Map<string, string>, key: string): string {
     let root = key;
@@ -229,6 +230,15 @@ export class SketchSolver implements ExternalEntityHost {
 
     addLine(x1: number, y1: number, x2: number, y2: number): number {
         return this.registerEntity("line", this.addEntityParams("line", [x1, y1, x2, y2]));
+    }
+
+    /** Only the endpoints enter PlaneGCS; interior interpolation points remain fixed client-side. */
+    addSpline(points: readonly SplinePoint[]): Result<number> {
+        const params = splineParams(points);
+        if (!params.isOk) return Result.err(params.error);
+        const id = this.registerEntity("spline", this.addEntityParams("spline", params.value));
+        this.entityCache.set(id, [...params.value]);
+        return Result.ok(id);
     }
 
     addPoint(x: number, y: number): number {
@@ -643,6 +653,7 @@ export class SketchSolver implements ExternalEntityHost {
             throw new Error(`Unknown sketch entity: ${entityId}`);
         }
         switch (type) {
+            case "spline":
             case "line":
                 return [this.pointOf({ entityId, pointIndex: 0 }), this.pointOf({ entityId, pointIndex: 1 })];
             case "arc":
@@ -1111,7 +1122,7 @@ export class SketchSolver implements ExternalEntityHost {
                     () => this.currentP2LDistance(refs),
                 );
             case ConstraintKind.Angle:
-                return this.withDatum(this.twoLineParams(refs), id, constraint, () =>
+                return this.withDatum(this.pointParams(...refs), id, constraint, () =>
                     this.currentAngle(refs),
                 );
             case ConstraintKind.HorizontalDistance:
@@ -1272,7 +1283,7 @@ export class SketchSolver implements ExternalEntityHost {
 
     private pointCacheIndices(ref: SketchPointRef): [number, number] {
         const type = this.entityTypes.get(ref.entityId);
-        if (type === "line" && (ref.pointIndex === 0 || ref.pointIndex === 1)) {
+        if ((type === "line" || type === "spline") && (ref.pointIndex === 0 || ref.pointIndex === 1)) {
             return [ref.pointIndex * 2, ref.pointIndex * 2 + 1];
         }
         if ((type === "arc" || type === "ellipse") && ref.pointIndex >= 0 && ref.pointIndex <= 2) {
@@ -1349,7 +1360,8 @@ export class SketchSolver implements ExternalEntityHost {
         const values = this.system.get_params(new Uint32Array(all));
         let offset = 0;
         for (const [id, ids] of this.entityParams) {
-            this.entityCache.set(id, Array.from(values.slice(offset, offset + ids.length)));
+            const interior = this.entityTypes.get(id) === "spline" ? this.entityCache.get(id)!.slice(4) : [];
+            this.entityCache.set(id, [...values.slice(offset, offset + ids.length), ...interior]);
             offset += ids.length;
         }
     }
@@ -1364,6 +1376,7 @@ export class SketchSolver implements ExternalEntityHost {
         }
         for (const entity of data.entities) {
             this.registerEntity(entity.type, this.addEntityParams(entity.type, entity.params), entity.id);
+            if (entity.type === "spline") this.entityCache.set(entity.id, [...entity.params]);
             if (entity.construction) this.constructionEntities.add(entity.id);
         }
         for (const constraint of data.constraints) {
@@ -1386,7 +1399,7 @@ export class SketchSolver implements ExternalEntityHost {
     private addEntityParams(type: SketchEntityType, values: number[]): number[] {
         const ids = this.system.add_params(
             new Uint8Array(ENTITY_PARAM_KINDS[type]),
-            new Float64Array(values),
+            new Float64Array(type === "spline" ? values.slice(0, 4) : values),
         );
         return Array.from(ids);
     }

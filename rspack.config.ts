@@ -27,6 +27,8 @@ export default defineConfig({
         parser: {
             "css/auto": {
                 namedExports: false,
+                // Theme variables and properties set from JS are shared across modules.
+                dashedIdents: false,
             },
         },
         rules: [

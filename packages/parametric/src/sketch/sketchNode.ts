@@ -39,6 +39,7 @@ import {
     toWorld,
 } from "./sketchModel";
 import { SketchSolver } from "./solver";
+import { splineParams, splinePoints, splineSegments } from "./splineGeometry";
 
 export interface SketchNodeOptions {
     document: IDocument;
@@ -233,6 +234,16 @@ export class SketchNode extends ParameterShapeNode {
         const edges: IEdge[] = [];
         for (const entity of data.entities) {
             if (!isProfileEntity(entity)) continue;
+            if (entity.type === "spline") {
+                const valid = splineParams(splinePoints(entity.params));
+                if (!valid.isOk) return Result.err(valid.error);
+                for (const segment of splineSegments(entity.params)) {
+                    const edge = shapeFactory.bezier(segment.map((p) => toWorld(this.plane, ...p)));
+                    if (!edge.isOk) return Result.err(edge.error);
+                    edges.push(edge.value);
+                }
+                continue;
+            }
             const edge = this.entityEdge(entity);
             if (!edge.isOk) return Result.err(edge.error);
             edges.push(edge.value);
@@ -251,6 +262,8 @@ export class SketchNode extends ParameterShapeNode {
     private entityEdge(entity: SketchEntityData): Result<IEdge> {
         const p = entity.params;
         switch (entity.type) {
+            case "spline":
+                return Result.err("Splines produce multiple cubic edges");
             case "point":
                 return Result.err("Points do not produce profile edges");
             case "ellipse": {

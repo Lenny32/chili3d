@@ -17,70 +17,70 @@ import {
 } from "../../src/sketch/utilityOperations";
 import "./setup";
 
-test.each([ConstraintKind.HorizontalDistance, ConstraintKind.VerticalDistance])(
-    "transformed projected dimension %s retains its driving expression, survives paste, and removes cleanly",
-    (kind) => {
-        const scope = new Map([["length", { value: 3, unit: LENGTH_UNITS }]]);
-        const geometry: SketchEntityData = {
-            id: 1,
-            type: "line",
-            params: kind === ConstraintKind.HorizontalDistance ? [0, 0, 3, 0] : [0, 0, 0, 3],
-        };
-        const solver = new SketchSolver(
-            Plane.XY,
-            {
-                entities: [geometry],
-                constraints: [
-                    {
-                        id: 1,
-                        kind,
-                        refs: [
-                            { entityId: 1, pointIndex: 0 },
-                            { entityId: 1, pointIndex: 1 },
-                        ],
-                        datum: "length",
-                    },
-                    {
-                        id: 2,
-                        kind: ConstraintKind.Fix,
-                        refs: [{ entityId: 1, pointIndex: 0 }],
-                        datums: [0, 0],
-                    },
-                ],
-            },
-            scope,
+test.each([
+    ConstraintKind.HorizontalDistance,
+    ConstraintKind.VerticalDistance,
+])("transformed projected dimension %s retains its driving expression, survives paste, and removes cleanly", (kind) => {
+    const scope = new Map([["length", { value: 3, unit: LENGTH_UNITS }]]);
+    const geometry: SketchEntityData = {
+        id: 1,
+        type: "line",
+        params: kind === ConstraintKind.HorizontalDistance ? [0, 0, 3, 0] : [0, 0, 0, 3],
+    };
+    const solver = new SketchSolver(
+        Plane.XY,
+        {
+            entities: [geometry],
+            constraints: [
+                {
+                    id: 1,
+                    kind,
+                    refs: [
+                        { entityId: 1, pointIndex: 0 },
+                        { entityId: 1, pointIndex: 1 },
+                    ],
+                    datum: "length",
+                },
+                {
+                    id: 2,
+                    kind: ConstraintKind.Fix,
+                    refs: [{ entityId: 1, pointIndex: 0 }],
+                    datums: [0, 0],
+                },
+            ],
+        },
+        scope,
+    );
+    try {
+        ok(solver.applyTransform([1], { kind: "rotate", center: [0, 0], angle: Math.PI / 4 }));
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        near(
+            solver.entity(1)!.params,
+            transformEntity(geometry, { kind: "rotate", center: [0, 0], angle: Math.PI / 4 }).params,
         );
-        try {
-            ok(solver.applyTransform([1], { kind: "rotate", center: [0, 0], angle: Math.PI / 4 }));
-            expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
-            near(
-                solver.entity(1)!.params,
-                transformEntity(geometry, { kind: "rotate", center: [0, 0], angle: Math.PI / 4 }).params,
-            );
-            const saved = solver.toData();
-            expect(saved.constraints.find((c) => c.id === 1)!.datum).toBe("length");
-            const clipboard = ok(copySketchSelection(saved, [1]));
-            expect(clipboard.constraints).toHaveLength(2);
-            const ids = ok(solver.applyTransform([], { kind: "move", delta: [10, 0] }, clipboard));
-            expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
-            solver.setScope(new Map([["length", { value: 6, unit: LENGTH_UNITS }]]));
-            expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
-            const direction = saved.constraints.find((c) => c.id === 1)!.direction!;
-            for (const id of [1, ...ids]) {
-                const p = solver.entity(id)!.params;
-                expect((p[2] - p[0]) * direction[0] + (p[3] - p[1]) * direction[1]).toBeCloseTo(6, 6);
-            }
-            solver.removeConstraint(1);
-            expect(solver.toData().constraints.some((c) => c.id === 1)).toBe(false);
-            expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
-            solver.removeEntity(ids[0]);
-            expect(solver.toData().constraints).toHaveLength(1);
-            expect(solver.dofs()).toBe(2);
-        } finally {
-            solver.dispose();
+        const saved = solver.toData();
+        expect(saved.constraints.find((c) => c.id === 1)!.datum).toBe("length");
+        const clipboard = ok(copySketchSelection(saved, [1]));
+        expect(clipboard.constraints).toHaveLength(2);
+        const ids = ok(solver.applyTransform([], { kind: "move", delta: [10, 0] }, clipboard));
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        solver.setScope(new Map([["length", { value: 6, unit: LENGTH_UNITS }]]));
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        const direction = saved.constraints.find((c) => c.id === 1)!.direction!;
+        for (const id of [1, ...ids]) {
+            const p = solver.entity(id)!.params;
+            expect((p[2] - p[0]) * direction[0] + (p[3] - p[1]) * direction[1]).toBeCloseTo(6, 6);
         }
-    },
-);
+        solver.removeConstraint(1);
+        expect(solver.toData().constraints.some((c) => c.id === 1)).toBe(false);
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        solver.removeEntity(ids[0]);
+        expect(solver.toData().constraints).toHaveLength(1);
+        expect(solver.dofs()).toBe(2);
+    } finally {
+        solver.dispose();
+    }
+});
 
 test("fixed coordinate expressions stay live after transformation", () => {
     const scope = new Map([["x", { value: 2, unit: LENGTH_UNITS }]]);
@@ -242,30 +242,31 @@ test("clipboard is detached, keeps only internal constraints and pastes with mon
     near(pasted.data.entities[0].params, [11, 22, 14, 22]);
 });
 
-test.each(["move", "rotate", "mirror"] as const)(
-    "%s survives the real solver with internal relationships",
-    (kind) => {
-        const solver = new SketchSolver(Plane.XY, data);
-        try {
-            const transform =
-                kind === "move"
-                    ? { kind, delta: [10, 20] as [number, number] }
-                    : kind === "rotate"
-                      ? { kind, center: [0, 0] as [number, number], angle: Math.PI / 4 }
-                      : { kind, axis };
-            ok(solver.applyTransform([1, 2], transform, undefined, kind === "mirror"));
-            const before = solver.entities();
-            expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
-            for (const entity of before) near(solver.entity(entity.id)!.params, entity.params);
-            if (kind === "mirror")
-                expect(
-                    solver.toData().constraints.filter((c) => c.kind === ConstraintKind.Symmetric),
-                ).toHaveLength(3);
-        } finally {
-            solver.dispose();
-        }
-    },
-);
+test.each([
+    "move",
+    "rotate",
+    "mirror",
+] as const)("%s survives the real solver with internal relationships", (kind) => {
+    const solver = new SketchSolver(Plane.XY, data);
+    try {
+        const transform =
+            kind === "move"
+                ? { kind, delta: [10, 20] as [number, number] }
+                : kind === "rotate"
+                  ? { kind, center: [0, 0] as [number, number], angle: Math.PI / 4 }
+                  : { kind, axis };
+        ok(solver.applyTransform([1, 2], transform, undefined, kind === "mirror"));
+        const before = solver.entities();
+        expect(solver.solve(true).result.startsWith("Ok")).toBe(true);
+        for (const entity of before) near(solver.entity(entity.id)!.params, entity.params);
+        if (kind === "mirror")
+            expect(
+                solver.toData().constraints.filter((c) => c.kind === ConstraintKind.Symmetric),
+            ).toHaveLength(3);
+    } finally {
+        solver.dispose();
+    }
+});
 
 test("move detaches external relationships and rejects invalid transforms without mutation", () => {
     const solver = new SketchSolver(Plane.XY, data);

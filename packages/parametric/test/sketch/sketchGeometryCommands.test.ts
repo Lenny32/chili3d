@@ -216,26 +216,26 @@ describe("utility operations", () => {
         ).toHaveLength(2);
     });
 
-    test.each([false, true])(
-        "rotate supports numeric relative/absolute angles (absolute=%s)",
-        async (absolute) => {
-            const { handler, editor, click } = setup();
-            handler.selectEntities([1]);
-            const command = new SketchRotateCommand();
-            command.numeric = true;
-            command.angle = 90;
-            command.absolute = absolute;
-            const run = command.executeAsync();
-            await Promise.resolve();
-            await click(0, 0);
-            await click(0, 50);
-            command.apply();
-            await run;
-            const params = editor.solver.entity(1)!.params;
-            expect(params[2]).toBeCloseTo(absolute ? 100 : 0, 7);
-            expect(params[3]).toBeCloseTo(absolute ? 0 : 100, 7);
-        },
-    );
+    test.each([
+        false,
+        true,
+    ])("rotate supports numeric relative/absolute angles (absolute=%s)", async (absolute) => {
+        const { handler, editor, click } = setup();
+        handler.selectEntities([1]);
+        const command = new SketchRotateCommand();
+        command.numeric = true;
+        command.angle = 90;
+        command.absolute = absolute;
+        const run = command.executeAsync();
+        await Promise.resolve();
+        await click(0, 0);
+        await click(0, 50);
+        command.apply();
+        await run;
+        const params = editor.solver.entity(1)!.params;
+        expect(params[2]).toBeCloseTo(absolute ? 100 : 0, 7);
+        expect(params[3]).toBeCloseTo(absolute ? 0 : 100, 7);
+    });
 });
 
 describe("geometry edit transactions", () => {
@@ -338,27 +338,26 @@ describe("geometry command interaction", () => {
         await run;
     });
 
-    test.each([1, -1])(
-        "offset previews a fixed distance on side %s and leaves source unchanged",
-        async (side) => {
-            const { editor, node, move, click } = setup();
-            const preview = rs.spyOn(editor.annotations, "setGeometryPreview");
-            const command = new SketchOffsetCommand();
-            command.distance = 5;
-            const run = command.executeAsync();
-            await click(20);
-            move(20, side * 20);
-            const mesh = preview.mock.calls.at(-1)![0][0] as { position: Float32Array };
-            expect(Array.from(mesh.position)).toEqual([0, side * 5, 0, 100, side * 5, 0]);
-            expect(node.data.entities).toHaveLength(3);
-            await click(20, side * 20);
-            await run;
-            expect(node.data.entities).toHaveLength(4);
-            expect(node.data.entities[0]).toEqual(source);
-            expect(node.data.entities[3].params).toEqual([0, side * 5, 100, side * 5]);
-            expect(node.data.constraints).toEqual([]);
-        },
-    );
+    test.each([
+        1, -1,
+    ])("offset previews a fixed distance on side %s and leaves source unchanged", async (side) => {
+        const { editor, node, move, click } = setup();
+        const preview = rs.spyOn(editor.annotations, "setGeometryPreview");
+        const command = new SketchOffsetCommand();
+        command.distance = 5;
+        const run = command.executeAsync();
+        await click(20);
+        move(20, side * 20);
+        const mesh = preview.mock.calls.at(-1)![0][0] as { position: Float32Array };
+        expect(Array.from(mesh.position)).toEqual([0, side * 5, 0, 100, side * 5, 0]);
+        expect(node.data.entities).toHaveLength(3);
+        await click(20, side * 20);
+        await run;
+        expect(node.data.entities).toHaveLength(4);
+        expect(node.data.entities[0]).toEqual(source);
+        expect(node.data.entities[3].params).toEqual([0, side * 5, 100, side * 5]);
+        expect(node.data.constraints).toEqual([]);
+    });
 
     test("split cancellation removes preview meshes without changing geometry", async () => {
         const { editor, node, move, pressEscape, removeMesh } = setup();

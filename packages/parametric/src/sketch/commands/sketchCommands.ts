@@ -14,6 +14,7 @@ import {
     type IEdge,
     type IFace,
     type INode,
+    type Matrix4,
     type Plane,
     PubSub,
     resolveConstructionRef,
@@ -86,13 +87,22 @@ export function captureBoundaryExternalRefs(
     result: PlanePickResult & { kind: "face" },
     plane: Plane,
 ): ExternalRefData[] | undefined {
-    const localFace = result.data.shape as IFace;
+    return captureFaceBoundaryRefs(owner, result.data.shape as IFace, result.data.transform, plane);
+}
+
+/** `captureBoundaryExternalRefs` for a face given directly: `transform` takes it to world space. */
+export function captureFaceBoundaryRefs(
+    owner: INode,
+    localFace: IFace,
+    transform: Matrix4,
+    plane: Plane,
+): ExternalRefData[] | undefined {
     const localEdges = localFace.findSubShapes(ShapeTypes.edge) as IEdge[];
     const ownerEdges = sourceBodyEdges(owner);
     const refs: ExternalRefData[] = [];
     let nextId = FIRST_EXTERNAL_ENTITY_ID;
     for (const localEdge of localEdges) {
-        const worldEdge = localEdge.transformedMul(result.data.transform) as IEdge;
+        const worldEdge = localEdge.transformedMul(transform) as IEdge;
         try {
             const edgeId = trackedIdOfFaceEdge(owner, ownerEdges, localEdge);
             const ref = captureExternalRef(nextId, owner.id, plane, worldEdge, edgeId, "reference");

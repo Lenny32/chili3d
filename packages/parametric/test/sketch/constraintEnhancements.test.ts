@@ -39,38 +39,42 @@ test("collinear aligns multiple lines and points and survives reload", () => {
     expect(s.toData()).toEqual(data);
 });
 
-test.each(["line", "circle", "arc", "ellipse", "point", "spline"] as const)(
-    "block locks every %s degree of freedom",
-    (type) => {
-        const s = create();
-        const id =
-            type === "line"
-                ? s.addLine(1, 2, 10, 8)
-                : type === "circle"
-                  ? s.addCircle(1, 2, 5)
-                  : type === "arc"
-                    ? s.addArc(0, 0, 5, 0, 0, 5)
-                    : type === "ellipse"
-                      ? s.addEllipse(0, 0, 5, 0, 0, 3)
-                      : type === "point"
-                        ? s.addPoint(1, 2)
-                        : s.addSpline([
-                              [0, 0],
-                              [5, 3],
-                              [10, 0],
-                          ]).value;
-        const before = s.entity(id)!.params;
-        const block = s.addConstraint({ kind: ConstraintKind.Block, refs: [centerRef(id)] });
-        expect(s.solve(true).result).toMatch(/^Ok/);
-        expect(s.dofs()).toBe(0);
-        expect(s.diagnose().redundant).toEqual([]);
-        s.reset(s.toData());
-        expect(s.dofs()).toBe(0);
-        expect(s.entity(id)!.params).toEqual(before);
-        s.removeConstraint(block);
-        expect(s.solve(true).dofs).toBeGreaterThan(0);
-    },
-);
+test.each([
+    "line",
+    "circle",
+    "arc",
+    "ellipse",
+    "point",
+    "spline",
+] as const)("block locks every %s degree of freedom", (type) => {
+    const s = create();
+    const id =
+        type === "line"
+            ? s.addLine(1, 2, 10, 8)
+            : type === "circle"
+              ? s.addCircle(1, 2, 5)
+              : type === "arc"
+                ? s.addArc(0, 0, 5, 0, 0, 5)
+                : type === "ellipse"
+                  ? s.addEllipse(0, 0, 5, 0, 0, 3)
+                  : type === "point"
+                    ? s.addPoint(1, 2)
+                    : s.addSpline([
+                          [0, 0],
+                          [5, 3],
+                          [10, 0],
+                      ]).value;
+    const before = s.entity(id)!.params;
+    const block = s.addConstraint({ kind: ConstraintKind.Block, refs: [centerRef(id)] });
+    expect(s.solve(true).result).toMatch(/^Ok/);
+    expect(s.dofs()).toBe(0);
+    expect(s.diagnose().redundant).toEqual([]);
+    s.reset(s.toData());
+    expect(s.dofs()).toBe(0);
+    expect(s.entity(id)!.params).toEqual(before);
+    s.removeConstraint(block);
+    expect(s.solve(true).dofs).toBeGreaterThan(0);
+});
 
 test("equal angles share a free angle and follow a changed driving angle", () => {
     const s = create();
@@ -164,23 +168,25 @@ test("scale expressions follow document scope changes and trial forks preserve s
     }
 });
 
-test.each([ConstraintKind.Collinear, ConstraintKind.EqualAngle, ConstraintKind.Scale, ConstraintKind.Block])(
-    "diagnostics identify redundant enhanced constraint %s",
-    (kind) => {
-        const s = create();
-        const a = s.addLine(0, 0, 10, 0);
-        const b = s.addLine(20, 0, 30, 0);
-        const c = s.addLine(0, 10, 10, 10);
-        const d = s.addLine(20, 10, 30, 10);
-        const refs =
-            kind === ConstraintKind.Block
-                ? [centerRef(a)]
-                : (kind === ConstraintKind.EqualAngle ? [a, b, c, d] : [a, b]).flatMap(lineRefs);
-        const datum = kind === ConstraintKind.Scale ? 1 : undefined;
-        const first = s.addConstraint({ kind, refs, datum });
-        const second = s.addConstraint({ kind, refs, datum });
-        s.solve(true);
-        const diagnosis = s.diagnose();
-        expect(diagnosis.redundant.some((id) => id === first || id === second)).toBe(true);
-    },
-);
+test.each([
+    ConstraintKind.Collinear,
+    ConstraintKind.EqualAngle,
+    ConstraintKind.Scale,
+    ConstraintKind.Block,
+])("diagnostics identify redundant enhanced constraint %s", (kind) => {
+    const s = create();
+    const a = s.addLine(0, 0, 10, 0);
+    const b = s.addLine(20, 0, 30, 0);
+    const c = s.addLine(0, 10, 10, 10);
+    const d = s.addLine(20, 10, 30, 10);
+    const refs =
+        kind === ConstraintKind.Block
+            ? [centerRef(a)]
+            : (kind === ConstraintKind.EqualAngle ? [a, b, c, d] : [a, b]).flatMap(lineRefs);
+    const datum = kind === ConstraintKind.Scale ? 1 : undefined;
+    const first = s.addConstraint({ kind, refs, datum });
+    const second = s.addConstraint({ kind, refs, datum });
+    s.solve(true);
+    const diagnosis = s.diagnose();
+    expect(diagnosis.redundant.some((id) => id === first || id === second)).toBe(true);
+});

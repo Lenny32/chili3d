@@ -80,7 +80,7 @@ export class ConstructionNode extends GeometryNode {
         if (!Number.isFinite(value) || value <= 0) return;
         this.setProperty("displaySize", value, () => {
             this._mesh = undefined;
-            this.document.visual.context.redrawNode([this]);
+            this.redrawIfAttached();
         });
     }
 
@@ -236,10 +236,29 @@ export class ConstructionNode extends GeometryNode {
             this._mesh = undefined;
             this._cached = undefined;
             this.emitPropertyChanged("geometry", Result.err("Reevaluating construction object"));
-            this.document.visual.context.redrawNode([this]);
+            this.redrawIfAttached();
         } finally {
             this._notifying = false;
         }
+    }
+
+    /**
+     * Deleted nodes are kept alive (not disposed) for undo, so their listeners keep firing; the
+     * viewport removes their visual on delete and re-adds it on undo/redo, so only redraw while the
+     * node is still reachable from the document root, otherwise it would resurrect a ghost visual.
+     */
+    private redrawIfAttached(): void {
+        if (this.isAttachedToDocument()) this.document.visual.context.redrawNode([this]);
+    }
+
+    private isAttachedToDocument(): boolean {
+        const root = this.document.modelManager.rootNode;
+        let node: INode | undefined = this.parent;
+        while (node) {
+            if (node === root) return true;
+            node = node.parent;
+        }
+        return false;
     }
 
     override disposeInternal(): void {

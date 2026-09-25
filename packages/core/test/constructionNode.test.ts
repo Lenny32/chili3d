@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { rs } from "@rstest/core";
-import { GroupNode, Matrix4, Plane, Serializer, Transaction, XYZ } from "../src";
+import { GroupNode, type INode, Matrix4, type NodeRecord, Plane, Serializer, Transaction, XYZ } from "../src";
 import { ConstructionNode } from "../src/construction/node";
 import { DocumentConstructionResolver } from "../src/construction/resolver";
 import type { ConstructionDefinition, ConstructionRef } from "../src/construction/types";
@@ -255,5 +255,71 @@ describe("persistent construction objects", () => {
         restored.definition = offset(9);
         expect(changed.mock.calls.map(([property]) => property)).toContain("geometry");
         expect(dependent.mesh.edges!.position[2]).toBe(11);
+    });
+
+    test("deleting or undoing creation does not leave a ghost visual in the viewport", () => {
+        const doc = new TestDocument({ application: createMockApplication() });
+        // Mimic the viewport: its tree observer is registered before any construction node exists,
+        // so on delete it removes the visual first, then the node's own tree handler runs.
+        const displayed = new Set<INode>();
+        doc.modelManager.addNodeObserver((records: NodeRecord[]) => {
+            for (const record of records) {
+                if (["add", "insertBefore", "insertAfter"].includes(record.action))
+                    displayed.add(record.node);
+                else if (record.action === "remove" || record.action === "transfer")
+                    displayed.delete(record.node);
+            }
+        });
+        doc.visual.context.redrawNode = (nodes: INode[]) => {
+            for (const node of nodes) {
+                displayed.delete(node);
+                displayed.add(node);
+            }
+        };
+
+        let node!: ConstructionNode;
+        Transaction.execute(doc, "Create datum", () => {
+            node = new ConstructionNode({ document: doc, definition: offset(5) });
+            doc.modelManager.addNode(node);
+        });
+        expect(displayed.has(node)).toBe(true);
+
+        doc.history.undo();
+        expect(displayed.has(node)).toBe(false);
+        doc.history.redo();
+        expect(displayed.has(node)).toBe(true);
+
+        Transaction.execute(doc, "Delete datum", () => node.parent!.remove(node));
+        expect(displayed.has(node)).toBe(false);
+        node.displaySize = 80;
+        doc.modelManager.addNode(new GroupNode({ document: doc, name: "Later change" }));
+        expect(displayed.has(node)).toBe(false);
+
+        // Undo the two later edits, then the delete itself: the viewport's add path restores it.
+        const undoCount = doc.history.undoCount();
+        doc.history.undo();
+        doc.history.undo();
+        expect(displayed.has(node)).toBe(false);
+        doc.history.undo();
+        expect(doc.history.undoCount()).toBe(undoCount - 3);
+        expect(node.parent).toBe(doc.modelManager.rootNode);
+        expect(displayed.has(node)).toBe(true);
+    });
+
+    test("a node inside a deleted group is not redrawn", () => {
+        const doc = new TestDocument({ application: createMockApplication() });
+        const group = new GroupNode({ document: doc, name: "Group" });
+        doc.modelManager.addNode(group);
+        const node = new ConstructionNode({ document: doc, definition: offset(5) });
+        group.add(node);
+        const redrawn: INode[] = [];
+        doc.visual.context.redrawNode = (nodes: INode[]) => redrawn.push(...nodes);
+        node.displaySize = 60;
+        expect(redrawn).toEqual([node]);
+        group.parent!.remove(group);
+        redrawn.length = 0;
+        node.displaySize = 70;
+        doc.modelManager.addNode(new GroupNode({ document: doc, name: "Later change" }));
+        expect(redrawn).toEqual([]);
     });
 });

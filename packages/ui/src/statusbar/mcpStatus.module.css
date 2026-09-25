@@ -1,0 +1,36 @@
+.indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--statusbar-foreground-color);
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+        background-color: var(--hover-background-color);
+    }
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background-color: var(--foreground-muted-color);
+}
+
+.indicator[data-status="connecting"] .dot {
+    background-color: #d9a400;
+}
+
+.indicator[data-status="connected"] .dot {
+    background-color: #2e9d4f;
+}
+
+.indicator[data-status="offline"] .dot {
+    background-color: #c94040;
+}

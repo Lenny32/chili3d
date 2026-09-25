@@ -577,7 +577,7 @@ export class SketchEventHandler implements IEventHandler {
     private computeHoverTarget(view: IView, event: PointerEvent): { key?: string; mesh?: ShapeMeshData } {
         const pick = this.editor.activePick;
 
-        if (pick === undefined || pick.kind === "point") {
+        if (pick === undefined || pick.kind === "point" || pick.kind === "target") {
             const ref = this.hitTestPoint(view, event);
             if (ref !== undefined) {
                 const [u, v] = this.editor.solver.pointOf(ref);
@@ -592,7 +592,7 @@ export class SketchEventHandler implements IEventHandler {
             }
         }
 
-        if (pick === undefined || pick.kind === "entity") {
+        if (pick === undefined || pick.kind === "entity" || pick.kind === "target") {
             const entityId = this.hitTestEntity(view, event, pick?.entityType, pick?.datum ?? false);
             if (entityId !== undefined && isDatumEntityId(entityId)) {
                 return {

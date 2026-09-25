@@ -636,6 +636,7 @@ export const I18N_KEYS = [
     "ribbon.tab.utilities",
     "sketch.conflicting",
     "sketch.constraintExists",
+    "sketch.constructionPlaneInvalid{0}",
     "sketch.externalRefAssociativeOnly",
     "sketch.externalRefsLost{0}",
     "sketch.externalRefTypeChanged",

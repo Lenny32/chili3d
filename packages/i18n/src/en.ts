@@ -645,6 +645,8 @@ export default {
         "ribbon.tab.sketch": "Sketch",
         "sketch.conflicting": "Conflicting constraints",
         "sketch.constraintExists": "Constraint already exists",
+        "sketch.constructionPlaneInvalid{0}":
+            "Sketch construction plane is missing or invalid; the sketch is hidden ({0} warnings)",
         "sketch.externalRefAssociativeOnly": "External references only accept associative constraints",
         "sketch.externalRefsLost{0}":
             "{0} sketch external references lost their source; profiles use frozen geometry",

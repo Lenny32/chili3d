@@ -43,6 +43,8 @@ import {
 import { SketchSolver } from "./solver";
 import { splineParams, splinePoints, splineSegments } from "./splineGeometry";
 
+const NOT_A_PLANE = "Construction source is not a plane";
+
 export interface SketchNodeOptions {
     document: IDocument;
     plane: Plane;
@@ -111,7 +113,7 @@ export class SketchNode extends ParameterShapeNode {
         if (ref !== undefined) {
             const resolved = resolveConstructionRef(this.document, ref);
             if (!resolved.isOk) return Result.err(resolved.error);
-            if (resolved.value.kind !== "plane") return Result.err("Construction source is not a plane");
+            if (resolved.value.kind !== "plane") return Result.err(NOT_A_PLANE);
         }
         return super.shape;
     }
@@ -156,14 +158,27 @@ export class SketchNode extends ParameterShapeNode {
     private _danglingProfileCount: number;
     private _danglingSignature: string;
 
-    /** INodeWarning: dangling profile-role external references badge the model-tree row. */
+    /**
+     * INodeWarning: dangling profile-role external references and a lost construction
+     * plane (which hides the sketch: `shape` reports the error) badge the model-tree row.
+     */
     get warningCount(): number {
-        return this._danglingProfileCount;
+        return this._danglingProfileCount + (this._constructionPlaneError === undefined ? 0 : 1);
     }
 
-    /** INodeWarning: badge tooltip (and loss toast) — `{0}` takes `warningCount`. */
+    /**
+     * INodeWarning: badge tooltip — `{0}` takes `warningCount`. A lost construction
+     * plane wins: it hides the whole sketch, the more severe of the two warnings.
+     */
     get warningTooltip(): I18nKeys {
-        return "sketch.externalRefsLost{0}";
+        return this._constructionPlaneError === undefined
+            ? "sketch.externalRefsLost{0}"
+            : "sketch.constructionPlaneInvalid{0}";
+    }
+
+    /** The resolution error of the construction plane, undefined while it resolves (or is unset). */
+    get constructionPlaneError(): string | undefined {
+        return this._constructionPlaneError;
     }
 
     constructor(options: SketchNodeOptions) {
@@ -248,10 +263,19 @@ export class SketchNode extends ParameterShapeNode {
         const constructionRef = this.constructionPlaneRef;
         if (constructionRef !== undefined) {
             const resolved = resolveConstructionRef(this.document, constructionRef);
-            if (!resolved.isOk) return Result.err(resolved.error);
-            if (resolved.value.kind !== "plane") return Result.err("Construction source is not a plane");
+            if (!resolved.isOk) {
+                this.setConstructionPlaneError(resolved.error);
+                return Result.err(resolved.error);
+            }
+            if (resolved.value.kind !== "plane") {
+                this.setConstructionPlaneError(NOT_A_PLANE);
+                return Result.err(NOT_A_PLANE);
+            }
+            this.setConstructionPlaneError(undefined);
             const constructionPlane = resolved.value.plane;
             this.withoutHistory(() => this.setProperty("plane", constructionPlane));
+        } else {
+            this.setConstructionPlaneError(undefined);
         }
         if (!refsFresh) {
             this.refreshExternalRefs();
@@ -447,9 +471,9 @@ export class SketchNode extends ParameterShapeNode {
             const error = !resolved.isOk
                 ? resolved.error
                 : resolved.value.kind !== "plane"
-                  ? "Construction source is not a plane"
+                  ? NOT_A_PLANE
                   : undefined;
-            this._constructionPlaneError = error;
+            this.setConstructionPlaneError(error);
             if (error !== undefined) return false;
             if (resolved.value.kind !== "plane") return false;
             const constructionPlane = resolved.value.plane;
@@ -457,6 +481,8 @@ export class SketchNode extends ParameterShapeNode {
             this.withoutHistory(() => this.setProperty("plane", constructionPlane));
             return true;
         }
+        // The construction ref was cleared (or never set): no plane error can remain.
+        this.setConstructionPlaneError(undefined);
         const ref = this.planeRef;
         if (ref === undefined) return false;
         // A frozen source (a transient rollback preview, see `isFrozenSource`) yields no
@@ -471,6 +497,20 @@ export class SketchNode extends ParameterShapeNode {
         // setProperty (not the shape-changing variant): the caller regenerates.
         this.withoutHistory(() => this.setProperty("plane", plane));
         return true;
+    }
+
+    /**
+     * Syncs the lost-construction-plane warning. Like the dangling-ref badge, the
+     * tree row listens for a plain `warningCount` propertyChanged emission, fired
+     * only when the warning appears or clears (a changed message keeps the count).
+     */
+    private setConstructionPlaneError(error: string | undefined): void {
+        if (this._constructionPlaneError === error) return;
+        const oldCount = this.warningCount;
+        this._constructionPlaneError = error;
+        if (this.warningCount !== oldCount) {
+            this.emitPropertyChanged("warningCount", oldCount);
+        }
     }
 
     private isSamePlane(plane: Plane): boolean {
@@ -577,7 +617,7 @@ export class SketchNode extends ParameterShapeNode {
             this.emitPropertyChanged("warningCount", oldCount);
         }
         if (setChanged && signature !== "") {
-            PubSub.default.pub("showToast", this.warningTooltip, danglingIds.length);
+            PubSub.default.pub("showToast", "sketch.externalRefsLost{0}", danglingIds.length);
         }
     }
 

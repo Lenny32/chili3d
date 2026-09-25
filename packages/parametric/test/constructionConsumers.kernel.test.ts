@@ -250,6 +250,43 @@ describe("associative construction consumers", () => {
         expect(sketch.plane.origin.z).toBeCloseTo(5);
     });
 
+    test("a lost construction plane badges the sketch warning and clears once restored", () => {
+        const doc = documentFixture();
+        const source = new ConstructionNode({
+            document: doc,
+            definition: { kind: "plane-offset", source: { kind: "origin-plane", plane: "XY" }, distance: 5 },
+        });
+        doc.modelManager.addNode(source);
+        const sketch = new SketchNode({
+            document: doc,
+            plane: Plane.XY,
+            constructionPlaneRef: datum(source),
+            data: rectangle,
+        });
+        doc.modelManager.addNode(sketch);
+        expect(sketch.shape.isOk).toBe(true);
+        expect(sketch.warningCount).toBe(0);
+        expect(sketch.constructionPlaneError).toBeUndefined();
+        const warningEvents: number[] = [];
+        sketch.onPropertyChanged((property) => {
+            if (property === "warningCount") warningEvents.push(sketch.warningCount);
+        });
+
+        Transaction.execute(doc, "Delete source", () => source.parent!.remove(source));
+        expect(sketch.shape.isOk).toBe(false);
+        expect(sketch.warningCount).toBe(1);
+        expect(sketch.warningTooltip).toBe("sketch.constructionPlaneInvalid{0}");
+        expect(sketch.constructionPlaneError).toMatch(/missing|deleted|invalid/i);
+        expect(warningEvents).toEqual([1]);
+
+        doc.history.undo();
+        expect(sketch.shape.isOk).toBe(true);
+        expect(sketch.warningCount).toBe(0);
+        expect(sketch.warningTooltip).toBe("sketch.externalRefsLost{0}");
+        expect(sketch.constructionPlaneError).toBeUndefined();
+        expect(warningEvents).toEqual([1, 0]);
+    });
+
     test("construction axis edits invalidate a cached revolve and deletion produces an error", () => {
         const doc = documentFixture();
         const first = new ConstructionNode({

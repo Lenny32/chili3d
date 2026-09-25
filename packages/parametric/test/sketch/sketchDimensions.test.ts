@@ -392,6 +392,94 @@ describe("dimension commands", () => {
         }
     });
 
+    test("distance dimension on two preselected lines goes straight to placing their angle", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const horizontal = editor.solver.addLine(0, 0, 100, 0);
+            const vertical = editor.solver.addLine(0, 0, 0, 100);
+            editor.solve(true);
+            editor.selectEntities([horizontal, vertical]);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // the only click places the label
+            const run = new DistanceDimensionCommand().execute(app);
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 250));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("90.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.Angle);
+            expect(editor.selectedEntityIds).toEqual([]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension on a preselected point and line places their distance", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const line = editor.solver.addLine(0, 0, 100, 0);
+            const point = editor.solver.addPoint(50, 30);
+            editor.solve(true);
+            editor.selectEntities([point, line]);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            const run = new DistanceDimensionCommand().execute(app);
+            await tick();
+            handler.pointerDown(view, pointerEvent(470, 280));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("30.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.P2LDistance);
+            expect(constraints[0].refs).toEqual([
+                { entityId: point, pointIndex: 0 },
+                { entityId: line, pointIndex: 0 },
+                { entityId: line, pointIndex: 1 },
+            ]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension treats one preselected line as the first pick", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const line = editor.solver.addLine(0, 0, 100, 0);
+            editor.solve(true);
+            editor.selectEntities([line]);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // a click on empty space places the line's length
+            const run = new DistanceDimensionCommand().execute(app);
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 250));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("100.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.P2PDistance);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
     test("distance dimension ignores a second click on the line already picked", async () => {
         const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
         try {

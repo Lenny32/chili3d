@@ -78,6 +78,8 @@ function fakeEditor() {
             return Promise.resolve(entityId === undefined ? undefined : { entityId });
         }),
         pickPosition: rs.fn((_prompt: I18nKeys) => Promise.resolve(undefined)),
+        selectedEntityIds: [] as number[],
+        selectEntities: rs.fn((_ids: readonly number[]) => {}),
         pointQueue,
         entityQueue,
     };

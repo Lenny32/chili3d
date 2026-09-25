@@ -17,3 +17,8 @@ import "./sketchTrim";
 import "./sketchExtend";
 import "./sketchSplit";
 import "./sketchOffset";
+import "./sketchCopy";
+import "./sketchPaste";
+import "./sketchMove";
+import "./sketchRotate";
+import "./sketchMirror";

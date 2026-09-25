@@ -29,6 +29,7 @@ import {
     axisDistanceDimension,
     type DimensionAnchor,
     type DimensionGeometry,
+    directedDistanceDimension,
     distanceDimension,
     formatDatum,
     lineIntersection,
@@ -487,6 +488,19 @@ export class SketchAnnotationManager implements IDisposable {
     private dimensionGeometry(constraint: SketchConstraintData, px: number): DimensionGeometry | undefined {
         const anchor = this.anchors.get(constraint.id);
         const offset = anchor?.kind === "offset" ? anchor.offset : 0;
+        if (
+            constraint.direction &&
+            (constraint.kind === ConstraintKind.HorizontalDistance ||
+                constraint.kind === ConstraintKind.VerticalDistance)
+        ) {
+            return directedDistanceDimension(
+                this.solver.pointOf(constraint.refs[0]),
+                this.solver.pointOf(constraint.refs[1]),
+                constraint.direction,
+                offset,
+                px,
+            );
+        }
         switch (constraint.kind) {
             case ConstraintKind.P2PDistance:
                 return distanceDimension(
@@ -936,6 +950,19 @@ export class SketchAnnotationManager implements IDisposable {
         uv: [number, number],
     ): DimensionAnchor | undefined {
         const points = constraint.refs.map((r) => this.solver.pointOf(r));
+        if (
+            constraint.direction &&
+            (constraint.kind === ConstraintKind.HorizontalDistance ||
+                constraint.kind === ConstraintKind.VerticalDistance)
+        ) {
+            const [dx, dy] = constraint.direction;
+            return {
+                kind: "offset",
+                offset:
+                    -(uv[0] - (points[0][0] + points[1][0]) / 2) * dy +
+                    (uv[1] - (points[0][1] + points[1][1]) / 2) * dx,
+            };
+        }
         switch (constraint.kind) {
             case ConstraintKind.P2PDistance:
                 return { kind: "offset", offset: segmentOffset(points[0], points[1], uv) };

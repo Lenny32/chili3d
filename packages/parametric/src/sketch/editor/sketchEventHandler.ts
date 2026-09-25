@@ -70,6 +70,18 @@ export class SketchEventHandler implements IEventHandler {
     private hoverMeshId?: number;
     private hoverKey?: string;
     private readonly selectedEntities = new Set<number>();
+
+    get selectedEntityIds(): number[] {
+        return [...this.selectedEntities].filter(
+            (id) => id > 0 && this.editor.solver.entity(id) !== undefined,
+        );
+    }
+
+    selectEntities(ids: readonly number[]): void {
+        this.selectedEntities.clear();
+        for (const id of ids) this.selectedEntities.add(id);
+        this.updateSelectionHighlight(this.editor.view);
+    }
     private selectionMeshId?: number;
     private constraintMeshId?: number;
     private datumDisplayId?: number;
@@ -161,6 +173,7 @@ export class SketchEventHandler implements IEventHandler {
         this.pointDisplayId = undefined;
         this.showExternalRefs();
         this.showEntityPoints();
+        if (view) this.updateSelectionHighlight(view);
         view?.update();
     }
 

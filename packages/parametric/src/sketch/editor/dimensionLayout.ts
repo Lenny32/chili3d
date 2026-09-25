@@ -46,6 +46,25 @@ const ANGLE_LABEL_MARGIN_PX = 14;
 
 type Vec2 = [number, number];
 
+/** Project into the transformed measurement frame, lay out there, then return to sketch UV. */
+export function directedDistanceDimension(
+    p1: Vec2,
+    p2: Vec2,
+    direction: Vec2,
+    offset: number,
+    px: number,
+): DimensionGeometry | undefined {
+    const [dx, dy] = direction;
+    const local = ([x, y]: Vec2): Vec2 => [x * dx + y * dy, -x * dy + y * dx];
+    const world = ([x, y]: Vec2): Vec2 => [x * dx - y * dy, x * dy + y * dx];
+    const geometry = axisDistanceDimension(local(p1), local(p2), "h", offset, px);
+    if (!geometry) return undefined;
+    return {
+        textPosition: world(geometry.textPosition),
+        segments: geometry.segments.map(([x1, y1, x2, y2]) => [...world([x1, y1]), ...world([x2, y2])]),
+    };
+}
+
 /** Signed perpendicular offset of `position` from the segment p1→p2. */
 export function segmentOffset(p1: Vec2, p2: Vec2, position: Vec2): number {
     const dx = p2[0] - p1[0];

@@ -13,6 +13,7 @@ import {
 import { editableCurve, type GeometryEdit } from "./geometryEditing";
 import type { SolverSystem } from "./planegcs";
 import { newSolverSystem } from "./planegcs";
+import type { SketchClipboard } from "./sketchModel";
 import {
     ConstraintKind,
     datumEntityData,
@@ -35,6 +36,7 @@ import {
     toDatumSource,
 } from "./sketchModel";
 import { type SplinePoint, splineParams } from "./splineGeometry";
+import { type SketchTransform, transformSketchSelection } from "./utilityOperations";
 
 function findRoot(parent: Map<string, string>, key: string): string {
     let root = key;
@@ -76,6 +78,8 @@ interface ConstraintParams {
     datumSources?: ParameterValue[];
     /** Solver kind when it differs from the sketch-level kind (arc radius → P2PDistance). */
     solverKind?: ConstraintKind;
+    helperParams?: number[];
+    helperConstraints?: number[];
 }
 
 /** The kinds whose value arrives through a datum param rather than from the geometry. */
@@ -102,6 +106,9 @@ interface ConstraintRecord {
      * over it would replace the user's expression with its current value.
      */
     datumSources?: ParameterValue[];
+    direction?: [number, number];
+    helperParams?: number[];
+    helperConstraints?: number[];
 }
 
 /**
@@ -292,11 +299,26 @@ export class SketchSolver implements ExternalEntityHost {
         // a no-op beats throwing from a delete handler.
         if (record === undefined) return;
         this.system.remove_constraint(record.solverId);
+        for (const id of record.helperConstraints ?? []) this.system.remove_constraint(id);
+        for (const id of record.helperParams ?? []) this.system.remove_param(id);
         for (const datumParamId of record.datumParamIds ?? []) {
             this.system.remove_param(datumParamId);
         }
         this.constraints.delete(id);
         this._datumErrors.delete(id);
+    }
+
+    /** Validate a complete utility proposal before replacing any solver state. */
+    applyTransform(
+        ids: readonly number[],
+        transform: SketchTransform,
+        clipboard?: SketchClipboard,
+        copy = false,
+    ): Result<number[]> {
+        const proposal = transformSketchSelection(this.toData(), ids, transform, clipboard, copy);
+        if (!proposal.isOk) return Result.err(proposal.error);
+        this.reset(proposal.value.data);
+        return Result.ok(proposal.value.ids);
     }
 
     /** Apply a previewed edit, tracking old points onto surviving endpoints and centers. */
@@ -780,6 +802,7 @@ export class SketchSolver implements ExternalEntityHost {
                 refs: record.refs.map((r) => ({ ...r })),
             };
             const sources = this.persistedDatums(record);
+            if (record.direction) data.direction = [...record.direction];
             if (sources !== undefined) {
                 if (sources.length === 1) {
                     data.datum = sources[0];
@@ -1000,10 +1023,8 @@ export class SketchSolver implements ExternalEntityHost {
     }
 
     private addConstraintWithId(id: number, constraint: Omit<SketchConstraintData, "id">): void {
-        const { params, datumParamIds, datumSources, solverKind } = this.buildConstraintParams(
-            constraint,
-            id,
-        );
+        const { params, datumParamIds, datumSources, solverKind, helperParams, helperConstraints } =
+            this.buildConstraintParams(constraint, id);
         const solverId = this.system.add_constraint(
             solverKind ?? constraint.kind,
             new Uint32Array(params),
@@ -1018,6 +1039,9 @@ export class SketchSolver implements ExternalEntityHost {
             solverId,
             datumParamIds,
             datumSources,
+            direction: constraint.direction ? [...constraint.direction] : undefined,
+            helperParams,
+            helperConstraints,
         });
     }
 
@@ -1026,8 +1050,50 @@ export class SketchSolver implements ExternalEntityHost {
         constraint: Omit<SketchConstraintData, "id">,
         id: number,
     ): ConstraintParams {
+        if (constraint.direction) return this.directionalConstraintParams(constraint, id);
         if (DATUM_CONSTRAINTS.has(constraint.kind)) return this.datumConstraintParams(constraint, id);
         return { params: this.geometricConstraintParams(constraint) };
+    }
+
+    /** A hidden point follows p1 at a fixed offset, defining the transformed measurement axis. */
+    private directionalConstraintParams(
+        constraint: Omit<SketchConstraintData, "id">,
+        id: number,
+    ): ConstraintParams {
+        const dimension =
+            constraint.kind === ConstraintKind.HorizontalDistance ||
+            constraint.kind === ConstraintKind.VerticalDistance;
+        const [ux, uy] = constraint.direction!;
+        const [dx, dy] = dimension ? [-uy, ux] : [ux, uy];
+        const first = this.pointParamIds(constraint.refs[0]);
+        const second = this.pointParamIds(constraint.refs[1]);
+        const [x, y] = this.system.get_params(new Uint32Array(first));
+        const helperParams = Array.from(
+            this.system.add_params(new Uint8Array(4), new Float64Array([x + dx, y + dy, dx, dy])),
+        );
+        const [qx, qy, deltaX, deltaY] = helperParams;
+        const helperConstraints = [ConstraintKind.HorizontalDistance, ConstraintKind.VerticalDistance].map(
+            (kind, i) =>
+                this.system.add_constraint(
+                    kind,
+                    new Uint32Array([...first, qx, qy, i === 0 ? deltaX : deltaY]),
+                    null,
+                    true,
+                    0,
+                ),
+        );
+        const params = [...second, ...first, qx, qy];
+        if (!dimension)
+            return { params, helperParams, helperConstraints, solverKind: ConstraintKind.PointOnLine };
+        return {
+            ...this.withDatum(params, id, constraint, () => {
+                const [px, py] = this.system.get_params(new Uint32Array(second));
+                return (px - x) * ux + (py - y) * uy;
+            }),
+            helperParams,
+            helperConstraints,
+            solverKind: ConstraintKind.P2LDistance,
+        };
     }
 
     /**

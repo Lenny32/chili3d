@@ -43,6 +43,13 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
             {
                 groupName: "ribbon.group.modify",
                 items: ["sketch.trim", "sketch.extend", "sketch.split", "sketch.offset"],
+                collapsedItems: [
+                    "sketch.mirror",
+                    "sketch.copy",
+                    "sketch.paste",
+                    "sketch.move",
+                    "sketch.rotate",
+                ],
             },
             {
                 groupName: "ribbon.group.constraint",

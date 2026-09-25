@@ -254,6 +254,22 @@ function pairCandidate(
     return undefined;
 }
 
+/**
+ * The sketch selection as smart-dimension picks — a point entity as its point, lines, circles
+ * and arcs as themselves. Undefined when any selected item cannot be dimensioned.
+ */
+function preselection(editor: SketchEditor): DimensionSelection[] | undefined {
+    const selections: DimensionSelection[] = [];
+    for (const id of editor.selectedEntityIds) {
+        const type = editor.solver.entity(id)?.type;
+        if (type === "point") selections.push({ point: centerRef(id) });
+        else if ((SMART_DIMENSION_TYPES as readonly string[]).includes(type ?? ""))
+            selections.push({ entityId: id });
+        else return undefined;
+    }
+    return selections;
+}
+
 function isSameSelection(a: DimensionSelection, b: DimensionSelection): boolean {
     if ("point" in a) return "point" in b && pointRefKey(a.point) === pointRefKey(b.point);
     return "entityId" in b && a.entityId === b.entityId;
@@ -282,12 +298,25 @@ const SMART_DIMENSION_TYPES = ["line", "circle", "arc"] as const;
  * The smart dimension (Fusion's D). Click a line and its length follows the cursor; click a
  * circle or arc and its radius does — a click on empty space then places it. Clicking a
  * second item instead combines the two: two lines give their angle, a point or center and a
- * line their distance, two points the distance between them.
+ * line their distance, two points the distance between them. Items selected beforehand count
+ * as those clicks.
  */
 @command({ key: "dimension.distance", icon: "icon-dDimension" })
 export class DistanceDimensionCommand extends DimensionCommand {
     protected async executeWithEditor(editor: SketchEditor): Promise<void> {
-        const first = await this.pickSelection(editor, "prompt.pickSketchPointOrEntity", false);
+        // items selected before the command stand in for the picks: two go straight to
+        // placement, one is the first pick; anything else starts from scratch
+        const selected = preselection(editor) ?? [];
+        const pair = selected.length === 2 ? pairCandidate(editor, selected[0], selected[1]) : undefined;
+        if (pair !== undefined || selected.length === 1) editor.selectEntities([]);
+        if (pair !== undefined) {
+            await this.place(editor, pair);
+            return;
+        }
+        const first =
+            selected.length === 1
+                ? selected[0]
+                : await this.pickSelection(editor, "prompt.pickSketchPointOrEntity", false);
         // the default filter never lets a plain position through; the check narrows the type
         if (first === undefined || "position" in first) return;
         const single = singleCandidate(editor, first);

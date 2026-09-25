@@ -606,6 +606,10 @@ export class SketchEditor implements IDisposable {
         return this.eventHandler.selectedEntityIds;
     }
 
+    selectEntities(ids: readonly number[]): void {
+        this.eventHandler.selectEntities(ids);
+    }
+
     applyTransform(
         ids: readonly number[],
         transform: SketchTransform,

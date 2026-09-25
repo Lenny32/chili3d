@@ -59,6 +59,16 @@ describe("length units", () => {
         expect(parseLength(text, "mm").isOk).toBe(false);
     });
 
+    test("rejects a long digit run in linear time", () => {
+        // CodeQL: an ambiguous digit split backtracked polynomially on "9" + "99"×n + a bad tail.
+        const hostile = `9${"99".repeat(50_000)}!`;
+        const start = performance.now();
+        expect(parseLength(hostile, "mm").isOk).toBe(false);
+        expect(performance.now() - start).toBeLessThan(500);
+        expect(parseLength("12.", "mm").value).toBe(12);
+        expect(parseLength(".5", "cm").value).toBe(5);
+    });
+
     test("conversions round-trip every supported unit", () => {
         for (const unit of LENGTH_UNITS_LIST) {
             expect(toMillimetres(fromMillimetres(123.456, unit), unit)).toBeCloseTo(123.456, 10);

@@ -122,7 +122,10 @@ export function formatLengthForEditing(millimetres: number, unit: LengthUnit): s
     return String(Number(value.toFixed(EDITOR_DECIMALS[unit])));
 }
 
-const LENGTH_LITERAL = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*([A-Za-z]*)$/;
+// Each run of digits has exactly one way to match: the integer part stops at the dot, and the
+// fraction only starts after it. An ambiguous split (`\d+\.?\d*`) backtracks polynomially on
+// long digit runs that then fail to match, e.g. "999…9!".
+const LENGTH_LITERAL = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)\s*([A-Za-z]*)$/;
 
 /**
  * A typed length as millimetres: a number in `unit` (`10` in a cm project is 100 mm), or a

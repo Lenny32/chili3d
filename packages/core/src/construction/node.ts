@@ -6,7 +6,6 @@ import { Id, PubSub, Result } from "../foundation";
 import type { I18nKeys } from "../i18n";
 import { BoundingBox, Matrix4, XYZ } from "../math";
 import { GeometryNode, type INode } from "../model";
-import { property } from "../property";
 import { serializable, serialize } from "../serialize";
 import { type ICurve, type IFace, type IShapeMeshData, MeshDataUtils } from "../shape";
 import { evaluateConstruction } from "./evaluate";

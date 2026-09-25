@@ -271,6 +271,11 @@ class ConstructionSession {
         initial?: ConstructionDefinition,
     ) {
         this.values = initial ? { ...initial } : { kind: tool.kind };
+        // An along-path "To Object" definition keeps its point inside `position`; the form edits it as
+        // the `toPoint` source, so seed that field (a fresh pick still overwrites it).
+        const position = this.values["position"] as { kind?: string; point?: unknown } | undefined;
+        if (position?.kind === "to-point" && position.point && this.values["toPoint"] === undefined)
+            this.values["toPoint"] = position.point;
         for (const field of tool.numbers ?? []) {
             if (this.valueFor(field.name) === undefined && !field.optional)
                 this.values[field.name] = field.value;

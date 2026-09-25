@@ -150,6 +150,47 @@ describe("construction command forms", () => {
         expect(node.definition).toMatchObject({ distance: 15 });
     });
 
+    test.each([
+        "point-along-path",
+        "plane-along-path",
+    ] as const)("editing a saved To Object %s definition previews and applies without re-picking", async (kind) => {
+        const { app, doc, display } = setup();
+        const toPoint = {
+            kind: "fixed" as const,
+            geometry: { kind: "point" as const, point: new XYZ({ x: 7, y: 2, z: 0 }) },
+        };
+        const path = {
+            kind: "fixed" as const,
+            geometry: { kind: "axis" as const, origin: XYZ.zero, direction: XYZ.unitX },
+        };
+        const definition =
+            kind === "point-along-path"
+                ? { kind, path, position: { kind: "to-point" as const, point: toPoint } }
+                : { kind, path, position: { kind: "to-point" as const, point: toPoint }, offset: 0 };
+        const node = new ConstructionNode({ document: doc, definition });
+        doc.modelManager.addNode(node);
+        doc.selection.getSelectedNodes = () => [node];
+        const completion = new EditConstructionCommand().execute(app);
+        expect(panel().querySelector("[role=status]")?.textContent).toBe("Preview ready");
+        expect(display).toHaveBeenCalledTimes(1);
+        const toPointRow = [...panel().querySelectorAll("label")].find(
+            (element) => element.textContent === "To Object point",
+        );
+        expect(toPointRow).not.toBeUndefined();
+        expect(toPointRow!.parentElement!.querySelector("small")?.textContent).toBe("Fixed point");
+        button("Apply").click();
+        await completion;
+        expect(document.querySelector(".chili-construction-editor")).toBeNull();
+        expect(node.definition).toMatchObject({ kind, position: { kind: "to-point", point: toPoint } });
+        expect(node.definition).not.toHaveProperty("toPoint");
+        const geometry = node.geometry.unchecked()!;
+        const origin =
+            geometry.kind === "point"
+                ? geometry.point
+                : (geometry as { plane: { origin: XYZ } }).plane.origin;
+        expect(origin.isEqualTo(new XYZ({ x: 7, y: 0, z: 0 }))).toBe(true);
+    });
+
     test("picking a construction source retains its ID", async () => {
         const { app, doc } = setup();
         const source = new ConstructionNode({

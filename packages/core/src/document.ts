@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { AnalysisManager } from "./analysis";
 import type { IApplication } from "./application";
 import type { History, IDisposable, IPropertyChanged, ObservableCollection } from "./foundation";
 import type { ModelManager } from "./modelManager";
@@ -13,6 +14,7 @@ export const DOCUMENT_FILE_EXTENSION = ".cd";
 export const PLUGIN_FILE_EXTENSION = ".chiliplugin";
 
 export interface IDocument extends IPropertyChanged, IDisposable {
+    readonly analyses: AnalysisManager;
     readonly selection: ISelection;
     readonly picker: IPicker;
     readonly id: string;

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type AnalysisAppearance,
     BoundingBox,
     type CollectionChangedArgs,
     ComponentNode,
@@ -23,6 +24,7 @@ import {
     type MeshOption,
     type NodeRecord,
     NodeUtils,
+    type Plane,
     RefSegmentAnnotation,
     type ShapeMeshData,
     type ShapeNode,
@@ -30,7 +32,7 @@ import {
     ShapeTypes,
     Texture,
     XY,
-    type XYZ,
+    XYZ,
 } from "@chili3d/core";
 import {
     Box3,
@@ -46,8 +48,12 @@ import {
     Points,
     type Scene,
     type Material as ThreeMaterial,
+    Plane as ThreePlane,
     Vector3,
 } from "three";
+import { Line2 } from "three/examples/jsm/lines/Line2.js";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { createAnalysisMaterial } from "./analysisAppearance";
 import { ThreeRefSegmentAnnotation } from "./threeAnnotation";
 import { ThreeGeometry } from "./threeGeometry";
 import { ThreeGeometryFactory } from "./threeGeometryFactory";
@@ -55,6 +61,14 @@ import { ThreeHelper } from "./threeHelper";
 import { GroupVisualObject, ThreeComponentObject, ThreeMeshObject } from "./threeVisualObject";
 
 export class ThreeVisualContext implements IVisualContext {
+    private readonly analysisClips = new Map<string, { plane: Plane; token: symbol }>();
+    private readonly priorClips = new WeakMap<object, ThreePlane[]>();
+    private readonly appearanceLeases = new Map<
+        string,
+        { token: symbol; appearances: AnalysisAppearance[] }
+    >();
+    private readonly originalMaterials = new Map<Mesh, ThreeMaterial | ThreeMaterial[]>();
+    private readonly analysisMaterials = new Map<Mesh, ThreeMaterial>();
     private readonly _visualNodeMap = new Map<IVisualObject, INode>();
     private readonly _NodeVisualMap = new Map<INode, IVisualObject & Object3D>();
     readonly materialMap = new Map<string, ThreeMaterial>();
@@ -164,6 +178,10 @@ export class ThreeVisualContext implements IVisualContext {
     }
 
     dispose() {
+        this.analysisClips.clear();
+        this.applyAnalysisClip();
+        this.appearanceLeases.clear();
+        this.refreshAnalysisAppearance();
         this.visualShapes.traverse((x) => {
             if (isDisposable(x)) x.dispose();
         });
@@ -179,6 +197,114 @@ export class ThreeVisualContext implements IVisualContext {
         this._visualNodeMap.clear();
         this._NodeVisualMap.clear();
         this.scene.remove(this.visualShapes, this.tempShapes);
+    }
+
+    acquireAnalysisAppearance(ownerId: string, appearances: AnalysisAppearance[]): () => void {
+        const token = Symbol(ownerId);
+        this.appearanceLeases.delete(ownerId);
+        this.appearanceLeases.set(ownerId, { token, appearances });
+        this.refreshAnalysisAppearance();
+        let released = false;
+        return () => {
+            if (released || this.appearanceLeases.get(ownerId)?.token !== token) return;
+            released = true;
+            this.appearanceLeases.delete(ownerId);
+            this.refreshAnalysisAppearance();
+        };
+    }
+
+    refreshAnalysisAppearance(): void {
+        const live = new Set<Mesh>();
+        for (const [node, visual] of this._NodeVisualMap) {
+            const candidate = visual as { wholeVisual?: () => Object3D[] };
+            for (const object of candidate.wholeVisual?.() ?? []) {
+                if (!(object instanceof Mesh) || object instanceof LineSegments2 || object instanceof Line2)
+                    continue;
+                live.add(object);
+                let appearance: AnalysisAppearance | undefined;
+                for (const lease of this.appearanceLeases.values()) {
+                    const match = lease.appearances.find((item) => item.nodeId === node.id);
+                    if (match) appearance = match;
+                }
+                if (!appearance) {
+                    const original = this.originalMaterials.get(object);
+                    if (original) object.material = original;
+                    this.originalMaterials.delete(object);
+                    this.analysisMaterials.get(object)?.dispose();
+                    this.analysisMaterials.delete(object);
+                    continue;
+                }
+                if (!this.originalMaterials.has(object)) this.originalMaterials.set(object, object.material);
+                this.analysisMaterials.get(object)?.dispose();
+                const material = createAnalysisMaterial(appearance);
+                this.analysisMaterials.set(object, material);
+                object.material = material;
+            }
+        }
+        for (const [mesh, original] of this.originalMaterials) {
+            if (live.has(mesh)) continue;
+            mesh.material = original;
+            this.originalMaterials.delete(mesh);
+            this.analysisMaterials.get(mesh)?.dispose();
+            this.analysisMaterials.delete(mesh);
+        }
+        this.visual.update();
+    }
+
+    updateAnalysisBaseMaterial(mesh: Mesh, material: ThreeMaterial | ThreeMaterial[]): void {
+        if (this.originalMaterials.has(mesh)) this.originalMaterials.set(mesh, material);
+        if (this.appearanceLeases.size) this.refreshAnalysisAppearance();
+    }
+
+    acquireAnalysisClip(ownerId: string, plane: Plane): () => void {
+        const token = Symbol(ownerId);
+        this.analysisClips.delete(ownerId);
+        this.analysisClips.set(ownerId, { plane, token });
+        this.applyAnalysisClip();
+        let released = false;
+        return () => {
+            if (released) return;
+            released = true;
+            if (this.analysisClips.get(ownerId)?.token !== token) return;
+            this.analysisClips.delete(ownerId);
+            this.applyAnalysisClip();
+        };
+    }
+
+    isAnalysisPointVisible(point: { x: number; y: number; z: number }): boolean {
+        const active = [...this.analysisClips.values()].at(-1)?.plane;
+        return !active || active.normal.dot(new XYZ(point).sub(active.origin)) >= -1e-6;
+    }
+
+    applyAnalysisClipToView(view: { renderer: { clippingPlanes: ThreePlane[] }; update(): void }): void {
+        const renderer = view.renderer;
+        const active = [...this.analysisClips.values()].at(-1)?.plane;
+        if (active) {
+            if (!this.priorClips.has(renderer)) this.priorClips.set(renderer, [...renderer.clippingPlanes]);
+            renderer.clippingPlanes = [
+                ...this.priorClips.get(renderer)!,
+                new ThreePlane(
+                    new Vector3(active.normal.x, active.normal.y, active.normal.z),
+                    -active.normal.dot(active.origin),
+                ),
+            ];
+        } else {
+            const prior = this.priorClips.get(renderer);
+            if (prior) {
+                renderer.clippingPlanes = prior;
+                this.priorClips.delete(renderer);
+            }
+        }
+        view.update();
+    }
+
+    private applyAnalysisClip(): void {
+        this.visual.document.application.views.forEach((view) => {
+            if (view.document !== this.visual.document || !("renderer" in view)) return;
+            this.applyAnalysisClipToView(
+                view as { renderer: { clippingPlanes: ThreePlane[] }; update(): void },
+            );
+        });
     }
 
     getNode(visual: IVisualObject): INode | undefined {
@@ -257,7 +383,11 @@ export class ThreeVisualContext implements IVisualContext {
             } else if (MeshDataUtils.isEdgeMesh(data)) {
                 group.add(ThreeGeometryFactory.createEdgeGeometry(data, meshOption));
             } else if (MeshDataUtils.isFaceMesh(data)) {
-                group.add(ThreeGeometryFactory.createFaceGeometry(data, meshOption));
+                const face = ThreeGeometryFactory.createFaceGeometry(data, meshOption);
+                face.material.polygonOffset = true;
+                face.material.polygonOffsetFactor = -1;
+                face.material.polygonOffsetUnits = -1;
+                group.add(face);
             }
         });
         this.tempShapes.add(group);
@@ -372,6 +502,7 @@ export class ThreeVisualContext implements IVisualContext {
                 this.displayNode(node);
             }
         });
+        if (this.appearanceLeases.size) this.refreshAnalysisAppearance();
     }
 
     private displayNode(node: INode) {
@@ -405,6 +536,7 @@ export class ThreeVisualContext implements IVisualContext {
             visual.parent?.remove(visual);
             visual.dispose();
         });
+        if (this.appearanceLeases.size) this.refreshAnalysisAppearance();
     }
 
     private getParentVisual(node: INode): Group {

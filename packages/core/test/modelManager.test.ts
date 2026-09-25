@@ -45,6 +45,7 @@ describe("ModelManager", () => {
 
     beforeEach(() => {
         doc = new TestDocument();
+        doc.analyses.dispose();
         modelManager = doc.modelManager;
     });
 

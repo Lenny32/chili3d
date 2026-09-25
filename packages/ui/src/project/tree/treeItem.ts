@@ -2,13 +2,17 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    AnalysisNode,
     Binding,
+    componentAnalysisColor,
     FolderNode,
     I18n,
     type IDocument,
     type INode,
     isNodeIcon,
     isNodeWarning,
+    MeshNode,
+    ShapeNode,
     Transaction,
 } from "@chili3d/core";
 import { label, setSVGIcon, span, svg } from "@chili3d/element";
@@ -24,6 +28,7 @@ export abstract class TreeItem extends HTMLElement {
      * after the eye icon.
      */
     readonly warningBadge: HTMLElement;
+    readonly componentSwatch: HTMLElement;
 
     private _node: INode;
     get node() {
@@ -50,6 +55,8 @@ export abstract class TreeItem extends HTMLElement {
             className: `${style.warning} ${style.hidden}`,
             textContent: "!",
         });
+        this.componentSwatch = span({ className: `${style.componentSwatch} ${style.hidden}` });
+        this.refreshComponentColor();
         this.setVisibleStyle(node.parentVisible);
         this.refreshVisibleIcon();
         this.refreshWarningBadge();
@@ -63,6 +70,19 @@ export abstract class TreeItem extends HTMLElement {
     refreshVisibleIcon() {
         const consumed = this.node.parent !== undefined && !(this.node.parent instanceof FolderNode);
         this.visibleIcon.classList.toggle(style.hidden, consumed);
+    }
+
+    refreshComponentColor(): void {
+        const active = this.document.analyses.items.some(
+            (analysis) =>
+                analysis.kind === "componentColors" && analysis.visible && analysis.status === "ready",
+        );
+        const show = active && (this.node instanceof ShapeNode || this.node instanceof MeshNode);
+        this.componentSwatch.classList.toggle(style.hidden, !show);
+        if (show) {
+            this.componentSwatch.style.backgroundColor = `#${componentAnalysisColor(this.node).toString(16).padStart(6, "0")}`;
+            this.componentSwatch.title = "Component color";
+        }
     }
 
     connectedCallback(): void {
@@ -90,7 +110,8 @@ export abstract class TreeItem extends HTMLElement {
         const count = warning?.warningCount ?? 0;
         this.warningBadge.classList.toggle(style.hidden, count === 0);
         if (warning !== undefined && count > 0) {
-            I18n.set(this.warningBadge, "title", warning.warningTooltip, count);
+            if (node instanceof AnalysisNode) this.warningBadge.title = node.warningTooltip;
+            else I18n.set(this.warningBadge, "title", warning.warningTooltip, count);
         }
     }
 

@@ -171,6 +171,7 @@ export class ThreeMeshObject extends ThreeVisualObject implements IHighlightable
         if (this._mesh instanceof LineSegments2) {
             this._mesh.material = this.material as LineMaterial;
         }
+        this.context.refreshAnalysisAppearance();
     }
 
     getSubShapeAndIndex(
@@ -213,7 +214,9 @@ export class ThreeMeshObject extends ThreeVisualObject implements IHighlightable
         } else if (property === "materialId" && this._mesh instanceof Mesh) {
             this.material = this.context.getMaterial(this.meshNode.materialId);
             this._mesh.material = this.material;
+            this.context.updateAnalysisBaseMaterial(this._mesh, this.material);
         }
+        this.context.refreshAnalysisAppearance();
     };
 
     private newMesh() {

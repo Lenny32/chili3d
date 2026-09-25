@@ -7,7 +7,7 @@ import { type AsyncController, Precision } from "../../foundation";
 import type { I18nKeys } from "../../i18n";
 import { type Line, type Plane, XYZ } from "../../math";
 import type { ICurve, ShapeType } from "../../shape";
-import type { IView } from "../../visual";
+import { type IView, screenDistance } from "../../visual";
 import { type Dimension, DimensionUtils } from "../dimension";
 import type { ISnap, SnapData, SnapResult } from "../snap";
 import { AxisSnap, ObjectSnap, PlaneSnap, PointOnCurveSnap, SurfaceSnap, WorkplaneSnap } from "../snaps";
@@ -42,6 +42,36 @@ export class PointSnapEventHandler extends SnapEventHandler<PointSnapData> {
         const trackingSnap = new TrackingSnap(pointData.refPoint, true);
         const surfaceSnap = new SurfaceSnap();
         return [objectSnap, trackingSnap, surfaceSnap, workplaneSnap];
+    }
+
+    protected override findSnapPoint(shapeType: ShapeType, view: IView, event: PointerEvent): void {
+        this._snaped = undefined;
+        super.findSnapPoint(shapeType, view, event);
+        // Analysis markers are temporary display data, so they cannot be found by
+        // the topology picker. Offer the ready mass center as a point snap instead.
+        if (this.data.plane) return;
+        let nearest: SnapResult | undefined = this.snaped;
+        let distance = nearest?.point
+            ? screenDistance(view, event.offsetX, event.offsetY, nearest.point)
+            : Config.instance.SnapDistance;
+        for (const analysis of view.document.analyses.items) {
+            if (
+                analysis.kind !== "centerOfMass" ||
+                analysis.status !== "ready" ||
+                !analysis.visible ||
+                !analysis.parentVisible
+            )
+                continue;
+            const marker = view.document.analyses.result(analysis)?.marker;
+            if (!marker || ![marker.x, marker.y, marker.z].every(Number.isFinite)) continue;
+            if (view.document.visual.context.isAnalysisPointVisible?.(marker) === false) continue;
+            const point = new XYZ(marker);
+            const candidateDistance = screenDistance(view, event.offsetX, event.offsetY, point);
+            if (candidateDistance >= distance || candidateDistance >= Config.instance.SnapDistance) continue;
+            distance = candidateDistance;
+            nearest = { view, point, info: analysis.name, shapes: [], type: "feature" };
+        }
+        this._snaped = nearest;
     }
 
     protected getPointFromInput(view: IView, text: string): SnapResult {

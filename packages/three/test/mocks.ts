@@ -41,6 +41,18 @@ export function createThreeMockVisualContext(visualMap?: Map<VisualNode, Mesh>):
         tempShapes: new Group(),
         cssObjects: new Group(),
         materialMap: new Map(),
+        applyAnalysisClipToView() {},
+        isAnalysisPointVisible() {
+            return true;
+        },
+        refreshAnalysisAppearance() {},
+        updateAnalysisBaseMaterial() {},
+        acquireAnalysisAppearance() {
+            return () => {};
+        },
+        acquireAnalysisClip() {
+            return () => {};
+        },
         getVisual(node: VisualNode) {
             return visualMap?.get(node) as any;
         },

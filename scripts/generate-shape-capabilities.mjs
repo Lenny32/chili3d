@@ -14,6 +14,7 @@
 
 import { spawnSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
@@ -486,10 +487,14 @@ function main() {
 
 /** Keep the generated file biome-clean so regeneration never produces format diffs. */
 function formatGenerated() {
-    const fmt = spawnSync("npx", ["biome", "format", "--write", outPath], { stdio: "inherit" });
-    if (fmt.status !== 0) {
-        console.warn("warning: biome format failed; the generated file may not match repo formatting");
-    }
+    const require = createRequire(import.meta.url);
+    const biomePackage = require.resolve("@biomejs/biome/package.json");
+    const biomeLauncher = resolve(dirname(biomePackage), "bin/biome");
+    const fmt = spawnSync(process.execPath, [biomeLauncher, "format", "--write", outPath], {
+        stdio: "inherit",
+    });
+    if (fmt.error) throw fmt.error;
+    if (fmt.status !== 0) throw new Error(`Biome format failed with status ${fmt.status}`);
 }
 
 function renderQueryEntry(c) {

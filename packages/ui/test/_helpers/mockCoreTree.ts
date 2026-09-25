@@ -47,6 +47,9 @@ rs.mock("@chili3d/core", () => {
     }
     return {
         ...actual,
+        AnalysisNode: class AnalysisNode {},
+        ShapeNode: class ShapeNode {},
+        MeshNode: class MeshNode {},
         Binding: BindingMock,
         Transaction: TransactionMock,
         // The hoisted `actual` snapshots core mid-initialization, so PubSub must be stubbed.

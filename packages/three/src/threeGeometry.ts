@@ -67,6 +67,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
         if (this._faces) {
             this._faceMaterial = material;
             this._faces.material = material;
+            this.context.updateAnalysisBaseMaterial(this._faces, material);
         }
     }
 
@@ -131,6 +132,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             this.removeMeshes();
             this.generateShape();
         }
+        this.context.refreshAnalysisAppearance();
     };
 
     private generateShape() {
@@ -223,6 +225,7 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
             if (this._faces && this._faces.material !== lockFaceMaterial)
                 this.applyOnTopMaterial(this._faces, this._faceMaterial);
         }
+        this.context.refreshAnalysisAppearance();
     }
 
     cloneSubEdge(index: number) {

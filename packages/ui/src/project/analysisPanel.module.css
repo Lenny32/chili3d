@@ -1,0 +1,39 @@
+.panel {
+    display: grid;
+    gap: 0.5rem;
+    min-width: 22rem;
+    padding: 0.5rem;
+    align-content: start;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.row > input,
+.row > select {
+    min-width: 7rem;
+    max-width: 12rem;
+}
+
+.results {
+    display: grid;
+    gap: 0.25rem;
+}
+
+.resultRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.swatch {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    margin-right: 0.5em;
+    border-radius: 2px;
+}

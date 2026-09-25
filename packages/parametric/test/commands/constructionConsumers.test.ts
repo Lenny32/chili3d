@@ -18,7 +18,11 @@ import {
 } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import { PlanePickHandler } from "../../src/sketch/commands/planePickHandler";
-import { CreateSketch, CreateSketchOnUcsYZ } from "../../src/sketch/commands/sketchCommands";
+import {
+    CreateSketch,
+    CreateSketchOnUcsYZ,
+    CreateSketchOnUcsZX,
+} from "../../src/sketch/commands/sketchCommands";
 import { SketchEditor } from "../../src/sketch/editor/sketchEditor";
 import type { SketchNode } from "../../src/sketch/sketchNode";
 
@@ -89,5 +93,32 @@ test.each([
     const sketch = enter.mock.calls[0][0] as SketchNode;
     expect(sketch.constructionPlaneRef).toEqual({ kind: "datum", nodeId: source.id, member: "YZ" });
     expect(sketch.plane.normal.isEqualTo(XYZ.unitX)).toBe(true);
+    expect(sketch.plane.origin.isEqualTo(new XYZ({ x: 2, y: 3, z: 4 }))).toBe(true);
+});
+
+test.each([
+    { member: "YZ" as const, Command: CreateSketchOnUcsYZ, normal: XYZ.unitX },
+    { member: "ZX" as const, Command: CreateSketchOnUcsZX, normal: XYZ.unitY },
+])("UCS $member command honors its member when the UCS is picked from the tree", async ({
+    member,
+    Command,
+    normal,
+}) => {
+    const { app, doc, onNodeChanged } = setup();
+    const source = ucs(doc);
+    let selected: INode[] = [];
+    doc.selection.getSelectedNodes = () => selected;
+    const pickAsync = rs.fn(async (_handler: PlanePickHandler) => {
+        selected = [source];
+        onNodeChanged.emit([source]);
+    });
+    Object.assign(doc, { picker: { pickAsync } });
+    const enter = rs.spyOn(SketchEditor, "enter").mockImplementation(() => ({}) as SketchEditor);
+    await new Command().execute(app);
+    expect(pickAsync).toHaveBeenCalledTimes(1);
+    expect(enter).toHaveBeenCalledTimes(1);
+    const sketch = enter.mock.calls[0][0] as SketchNode;
+    expect(sketch.constructionPlaneRef).toEqual({ kind: "datum", nodeId: source.id, member });
+    expect(sketch.plane.normal.isEqualTo(normal)).toBe(true);
     expect(sketch.plane.origin.isEqualTo(new XYZ({ x: 2, y: 3, z: 4 }))).toBe(true);
 });

@@ -191,7 +191,7 @@ async function pickPlane(
         }
     }
     document.selection.clearSelection();
-    const handler = new PlanePickHandler(document, controller);
+    const handler = new PlanePickHandler(document, controller, ucsMember);
     await document.picker.pickAsync(handler, "prompt.select.plane", controller, false, "select.default");
     controller.dispose();
     handler.dispose();

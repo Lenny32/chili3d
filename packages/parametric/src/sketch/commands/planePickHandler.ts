@@ -71,7 +71,15 @@ export class PlanePickHandler extends ShapeSelectionHandler {
     private readonly _datumMeshIds: number[] = [];
     private _hoveredDatum = -1;
 
-    constructor(document: IDocument, controller: AsyncController) {
+    /**
+     * @param ucsMember the UCS plane used when a UCS node is picked from the project
+     * tree (the `CreateSketchOnUcsYZ`/`ZX` commands pass their member; defaults to XY).
+     */
+    constructor(
+        document: IDocument,
+        controller: AsyncController,
+        private readonly ucsMember: "XY" | "YZ" | "ZX" = "XY",
+    ) {
         super(document, ShapeTypes.face, false, controller, {
             allow: (shape) => (shape as IFace).surface().isPlanar(),
         });
@@ -91,7 +99,7 @@ export class PlanePickHandler extends ShapeSelectionHandler {
         const ref: ConstructionRef = {
             kind: "datum",
             nodeId: node.id,
-            ...(node.definition.kind === "ucs" ? { member: "XY" as const } : {}),
+            ...(node.definition.kind === "ucs" ? { member: this.ucsMember } : {}),
         };
         const resolved = resolveConstructionRef(this.document, ref);
         if (!resolved.isOk || resolved.value.kind !== "plane") return;

@@ -17,6 +17,11 @@ rs.mock("../src/statusbar/snapConfig", () => ({
     SnapConfig: class {},
 }));
 
+// McpStatusIndicator pulls in @chili3d/ai; it has its own test file (mcpStatus.test.ts).
+rs.mock("../src/statusbar/mcpStatus", () => ({
+    McpStatusIndicator: class {},
+}));
+
 // Recorded collaborators for the core mock. Factories may only reference
 // rs.hoisted-created values.
 const pubSubRecorder = rs.hoisted(() => {

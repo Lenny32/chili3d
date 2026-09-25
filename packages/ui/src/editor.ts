@@ -45,7 +45,6 @@ export class Editor extends HTMLElement {
         viewport.classList.add(style.viewport);
         this._viewportContainer = div({ className: style.viewportContainer }, viewport);
         this.render();
-        this.showChat();
     }
 
     private render() {

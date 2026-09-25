@@ -22,6 +22,7 @@ import {
     SelectableItems,
     SelectShapeStep,
     ShapeTypes,
+    setActiveConstructionPlane,
     XYZ,
 } from "@chili3d/core";
 import { div, RadioGroup } from "@chili3d/element";
@@ -44,6 +45,7 @@ export class SetWorkplane implements ICommand {
         PubSub.default.pub("showDialog", "dialog.title.selectWorkingPlane", this.ui(vm), () => {
             const planes = [Plane.XY, Plane.YZ, Plane.ZX];
             view.workplane = planes[vm.planes.selectedIndexes[0]];
+            setActiveConstructionPlane(view, undefined);
         });
     }
 
@@ -85,6 +87,7 @@ export class AlignToPlane implements ICommand {
             xvec = XYZ.unitZ.cross(normal).normalize()!;
         }
         view.workplane = new Plane({ origin: point, normal, xvec });
+        setActiveConstructionPlane(view, undefined);
     }
 }
 
@@ -105,6 +108,7 @@ export class FromSection extends MultistepCommand {
         const view = this.application.activeView;
         if (!view) return;
         view.workplane = plane;
+        setActiveConstructionPlane(view, undefined);
     }
 
     private findXVec(direction: XYZ) {

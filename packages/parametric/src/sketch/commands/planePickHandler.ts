@@ -3,6 +3,8 @@
 
 import {
     type AsyncController,
+    ConstructionNode,
+    type ConstructionRef,
     type FaceMeshData,
     type IDocument,
     type IFace,
@@ -10,6 +12,7 @@ import {
     MeshGroup,
     Plane,
     type Ray,
+    resolveConstructionRef,
     ShapeSelectionHandler,
     ShapeTypes,
     type VisualShapeData,
@@ -35,7 +38,10 @@ const DATUM_GAP = 50;
 const DATUM_COLOR = 0x707070;
 const DATUM_HIGHLIGHT_COLOR = 0x4a9eff;
 
-export type PlanePickResult = { kind: "face"; data: VisualShapeData } | { kind: "datum"; plane: Plane };
+export type PlanePickResult =
+    | { kind: "face"; data: VisualShapeData }
+    | { kind: "datum"; plane: Plane }
+    | { kind: "construction"; plane: Plane; ref: ConstructionRef };
 
 /** Double-sided translucent quad in the plane's positive quadrant, with a gap from the axes. */
 function datumQuad(plane: Plane): FaceMeshData {
@@ -65,7 +71,15 @@ export class PlanePickHandler extends ShapeSelectionHandler {
     private readonly _datumMeshIds: number[] = [];
     private _hoveredDatum = -1;
 
-    constructor(document: IDocument, controller: AsyncController) {
+    /**
+     * @param ucsMember the UCS plane used when a UCS node is picked from the project
+     * tree (the `CreateSketchOnUcsYZ`/`ZX` commands pass their member; defaults to XY).
+     */
+    constructor(
+        document: IDocument,
+        controller: AsyncController,
+        private readonly ucsMember: "XY" | "YZ" | "ZX" = "XY",
+    ) {
         super(document, ShapeTypes.face, false, controller, {
             allow: (shape) => (shape as IFace).surface().isPlanar(),
         });
@@ -74,7 +88,24 @@ export class PlanePickHandler extends ShapeSelectionHandler {
         for (const plane of DATUM_DISPLAY_PLANES) {
             this._datumMeshIds.push(context.displayMesh([datumQuad(plane)], { meshOpacity: 0.25 }));
         }
+        document.selection.onNodeChanged?.sub?.(this.handleNodeSelected);
     }
+
+    private readonly handleNodeSelected = () => {
+        const node = this.document.selection
+            .getSelectedNodes()
+            .find((item) => item instanceof ConstructionNode);
+        if (!(node instanceof ConstructionNode)) return;
+        const ref: ConstructionRef = {
+            kind: "datum",
+            nodeId: node.id,
+            ...(node.definition.kind === "ucs" ? { member: this.ucsMember } : {}),
+        };
+        const resolved = resolveConstructionRef(this.document, ref);
+        if (!resolved.isOk || resolved.value.kind !== "plane") return;
+        this.result = { kind: "construction", plane: resolved.value.plane, ref };
+        this.controller?.success();
+    };
 
     protected override setHighlight(view: IView, event: PointerEvent): void {
         super.setHighlight(view, event);
@@ -127,6 +158,7 @@ export class PlanePickHandler extends ShapeSelectionHandler {
     }
 
     protected override disposeInternal(): void {
+        this.document.selection.onNodeChanged?.remove?.(this.handleNodeSelected);
         super.disposeInternal();
         const context = this.document.visual.context;
         this._datumMeshIds.forEach((id) => {

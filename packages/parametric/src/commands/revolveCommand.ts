@@ -3,8 +3,13 @@
 
 import {
     ANGLE_UNITS,
+    type AsyncController,
+    Combobox,
+    ConstructionNode,
+    type ConstructionRef,
     CurveUtils,
     command,
+    type IDocument,
     Id,
     type IEdge,
     type IFace,
@@ -17,9 +22,12 @@ import {
     type ParameterValue,
     PubSub,
     property,
+    resolveConstructionRef,
+    SelectNodeStep,
     SelectShapeStep,
     ShapeNode,
     ShapeTypes,
+    type SnapResult,
     Transaction,
     VisualStates,
 } from "@chili3d/core";
@@ -32,6 +40,34 @@ import { SelectSketchProfilesStep } from "./extrudeCommand";
 
 @command({ key: "feature.revolve", icon: "icon-revolve" })
 export class RevolveFeatureCommand extends MultistepCommand {
+    @property("construction.axisSource", {
+        combobox: Combobox.from(["construction.axisSource.edge", "construction.axisSource.datum"]),
+    })
+    get axisMode() {
+        return this.getPrivateValue("axisMode", "construction.axisSource.edge");
+    }
+    set axisMode(value: string) {
+        this.setProperty("axisMode", value);
+    }
+
+    @property("construction.ucsAxis", {
+        combobox: Combobox.from([
+            "construction.ucsAxis.X",
+            "construction.ucsAxis.Y",
+            "construction.ucsAxis.Z",
+        ]),
+    })
+    get ucsAxis() {
+        return this.getPrivateValue("ucsAxis", "construction.ucsAxis.Z");
+    }
+    set ucsAxis(value: string) {
+        this.setProperty("ucsAxis", value);
+    }
+
+    private get ucsMember(): "X" | "Y" | "Z" {
+        return this.ucsAxis.endsWith(".X") ? "X" : this.ucsAxis.endsWith(".Y") ? "Y" : "Z";
+    }
+
     @property("common.angle", { unit: ANGLE_UNITS })
     get angle(): ParameterValue {
         return this.getPrivateValue("angle", 360);
@@ -47,16 +83,23 @@ export class RevolveFeatureCommand extends MultistepCommand {
     protected override getSteps(): IStep[] {
         return [
             new SelectSketchProfilesStep((node) => node instanceof SketchNode),
-            new SelectShapeStep(ShapeTypes.edge, "prompt.select.axis", {
-                shapeFilter: new LineEdgeFilter(),
-                keepSelection: true,
-                highlightState: VisualStates.edgeHighlight,
-                selectedState: VisualStates.edgeSelected,
-            }),
+            new SelectRevolveAxisStep(this),
         ];
     }
 
     private axis(): Line {
+        const datum = this.stepDatas[1].nodes?.[0];
+        if (datum instanceof ConstructionNode) {
+            const ref: ConstructionRef = {
+                kind: "datum",
+                nodeId: datum.id,
+                ...(datum.definition.kind === "ucs" ? { member: this.ucsMember } : {}),
+            };
+            const source = resolveConstructionRef(this.document, ref);
+            if (!source.isOk || source.value.kind !== "axis")
+                throw new Error(source.isOk ? "Select a construction axis" : source.error);
+            return new Line({ point: source.value.origin, direction: source.value.direction });
+        }
         const { shape, transform } = this.stepDatas[1].shapes[0];
         const curve = (shape as IEdge).curve.basisCurve as ILine;
         return new Line({
@@ -68,10 +111,14 @@ export class RevolveFeatureCommand extends MultistepCommand {
     protected override executeMainTask(): void {
         if (!this.validAngle()) return;
         const sketch = this.sketch;
-        const node = new ParametricBodyNode({
-            document: this.document,
-            features: [this.buildFeature()],
-        });
+        let feature: RevolveFeatureData;
+        try {
+            feature = this.buildFeature();
+        } catch (error) {
+            PubSub.default.pub("showToast", "error.default:{0}", String(error));
+            return;
+        }
+        const node = new ParametricBodyNode({ document: this.document, features: [feature] });
         Transaction.execute(this.document, "excute feature.revolve", () => {
             this.document.modelManager.addNode(node);
             // The sketch is consumed by the feature; hide it. Same transaction, so
@@ -105,6 +152,19 @@ export class RevolveFeatureCommand extends MultistepCommand {
             angle: this.angle,
             ...(faces.length > 0 ? { profiles: faces.map((face) => captureProfileRef(face)) } : {}),
             ...this.axisSource(),
+            ...this.constructionAxisSource(),
+        };
+    }
+
+    private constructionAxisSource(): Pick<RevolveFeatureData, "constructionAxisRef"> {
+        const node = this.stepDatas[1].nodes?.[0];
+        if (!(node instanceof ConstructionNode)) return {};
+        return {
+            constructionAxisRef: {
+                kind: "datum",
+                nodeId: node.id,
+                ...(node.definition.kind === "ucs" ? { member: this.ucsMember } : {}),
+            },
         };
     }
 
@@ -114,11 +174,51 @@ export class RevolveFeatureCommand extends MultistepCommand {
      */
     private axisSource(): Pick<RevolveFeatureData, "axisSource"> {
         const data = this.stepDatas[1].shapes[0];
+        if (!data) return {};
         const node = data.owner.node;
         if (!(node instanceof ShapeNode)) return {};
         return {
             axisSource: { nodeId: node.id, edge: captureEdgeRef(data.shape as unknown as IEdge) },
         };
+    }
+}
+
+class SelectRevolveAxisStep implements IStep {
+    constructor(private readonly command: RevolveFeatureCommand) {}
+
+    async execute(document: IDocument, controller: AsyncController): Promise<SnapResult | undefined> {
+        if (this.command.axisMode === "construction.axisSource.datum") {
+            const selected = document.selection
+                .getSelectedNodes()
+                .find(
+                    (node) =>
+                        node instanceof ConstructionNode &&
+                        (node.definition.kind.startsWith("axis-") || node.definition.kind === "ucs"),
+                );
+            if (selected) {
+                controller.success();
+                return {
+                    view: document.application.activeView!,
+                    type: "node",
+                    shapes: [],
+                    nodes: [selected as ConstructionNode],
+                };
+            }
+            return new SelectNodeStep("prompt.select.axis", {
+                filter: {
+                    allow: (node) =>
+                        node instanceof ConstructionNode &&
+                        (node.definition.kind.startsWith("axis-") || node.definition.kind === "ucs"),
+                },
+                keepSelection: true,
+            }).execute(document, controller);
+        }
+        return new SelectShapeStep(ShapeTypes.edge, "prompt.select.axis", {
+            shapeFilter: new LineEdgeFilter(),
+            keepSelection: true,
+            highlightState: VisualStates.edgeHighlight,
+            selectedState: VisualStates.edgeSelected,
+        }).execute(document, controller);
     }
 }
 

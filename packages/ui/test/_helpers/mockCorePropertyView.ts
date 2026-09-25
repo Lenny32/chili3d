@@ -38,6 +38,7 @@ rs.mock("@chili3d/core", () => {
         Node: class {},
         FolderNode: class {},
         GroupNode: class {},
+        ConstructionNode: class {},
         VisualNode: class {
             display() {
                 return "VisualObject";

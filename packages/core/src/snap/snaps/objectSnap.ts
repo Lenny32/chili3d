@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { Config, VisualConfig } from "../../config";
+import { ConstructionNode } from "../../construction/node";
 import type { IDocument } from "../../document";
 import { I18n, type I18nKeys } from "../../i18n";
 import { Line, type Ray, type XYZ } from "../../math";
@@ -83,7 +84,43 @@ export class ObjectSnap extends BaseSnap {
         if (this.referencePoint && snap?.point) {
             snap.distance = this.referencePoint().distanceTo(snap.point);
         }
+        if (ObjectSnapTypeUtils.hasType(this._snapType, ObjectSnapTypes.vertex)) {
+            const datum = this.snapConstructionPoint(data);
+            if (
+                datum &&
+                (!snap?.point ||
+                    screenDistance(data.view, data.mx, data.my, datum.point!) <
+                        screenDistance(data.view, data.mx, data.my, snap.point))
+            )
+                return datum;
+        }
         return snap;
+    }
+
+    private snapConstructionPoint(data: MouseAndDetected): SnapResult | undefined {
+        let nearest: { node: ConstructionNode; point: XYZ; distance: number } | undefined;
+        for (const candidate of data.view.document.modelManager.findNodes()) {
+            if (!(candidate instanceof ConstructionNode) || !candidate.visible || !candidate.parentVisible)
+                continue;
+            if (!candidate.definition.kind.startsWith("point-")) continue;
+            const geometry = candidate.geometry;
+            if (!geometry.isOk || geometry.value.kind !== "point") continue;
+            const point = geometry.value.point;
+            const distance = screenDistance(data.view, data.mx, data.my, point);
+            if (distance >= Config.instance.SnapDistance || (nearest && distance >= nearest.distance))
+                continue;
+            nearest = { node: candidate, point, distance };
+        }
+        if (!nearest) return undefined;
+        return {
+            view: data.view,
+            type: "vertex",
+            point: nearest.point,
+            info: I18n.translate("snap.vertex"),
+            shapes: [],
+            nodes: [nearest.node],
+            constructionRef: { kind: "datum", nodeId: nearest.node.id },
+        };
     }
 
     private snapOnShape(view: IView, x: number, y: number, shapes: VisualShapeData[]) {

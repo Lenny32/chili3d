@@ -3,6 +3,7 @@
 
 import {
     type AsyncController,
+    ConstructionNode,
     type FeatureItem,
     type FeatureReference,
     type I18nKeys,
@@ -23,6 +24,7 @@ import {
     serializable,
     serialize,
     Transaction,
+    withConstructionFeaturePosition,
 } from "@chili3d/core";
 import { ReselectFeatureCommand } from "./commands/reselectCommand";
 import { EdgeReselectSession, ProfileReselectSession } from "./commands/reselectSession";
@@ -595,9 +597,11 @@ export class ParametricBodyNode
                 timeline.push({ shape: input, faceIds, edgeIds });
                 const feature = features[index];
                 if (feature.suppressed) continue;
-                this.followReferencedSketches(feature, followedSketches);
-                this.refreshConsumedTools(feature);
-                const step = this.evaluateFeatureStep(feature, scope, input, faceIds, edgeIds, nextCache);
+                const step = withConstructionFeaturePosition(this.document, this.id, index, () => {
+                    this.followReferencedSketches(feature, followedSketches);
+                    this.refreshConsumedTools(feature);
+                    return this.evaluateFeatureStep(feature, scope, input, faceIds, edgeIds, nextCache);
+                });
                 if (!step.isOk) return this.abandonChain(feature, step.error, nextCache, features);
                 input = step.value.shape;
                 faceIds = step.value.faceIds;
@@ -893,6 +897,7 @@ export class ParametricBodyNode
         for (const [id, snapshot] of entry.refs) {
             const current = this.snapshotNode(id);
             if (current.shape !== snapshot.shape) return undefined;
+            if (current.datumJson !== snapshot.datumJson) return undefined;
             if (!sameTransform(current.transform, snapshot.transform)) return undefined;
         }
         return entry;
@@ -911,6 +916,14 @@ export class ParametricBodyNode
 
     private snapshotNode(id: string): RefSnapshot {
         const node = this.document.modelManager.findNode((n) => n.id === id);
+        if (node instanceof ConstructionNode) {
+            const result = node.geometry;
+            return {
+                shape: undefined,
+                transform: node.worldTransform(),
+                datumJson: result.isOk ? JSON.stringify(result.value) : `error:${result.error}`,
+            };
+        }
         if (!(node instanceof ShapeNode)) return { shape: undefined, transform: undefined };
         return { shape: node.shape, transform: node.worldTransform() };
     }
@@ -984,7 +997,7 @@ export class ParametricBodyNode
     // keeps the last good shape silently — the feature panel shows the error — instead
     // of toasting per change.
     private readonly handleWatchedNodeChanged = (property: string) => {
-        if (property !== "shape" && property !== "transform") return;
+        if (property !== "shape" && property !== "transform" && property !== "geometry") return;
         this.rebuildFromUpstream();
     };
 

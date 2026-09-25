@@ -14,6 +14,7 @@ import {
 } from "@chili3d/core";
 import {
     createMockApplication,
+    createMockSelection,
     createMockView,
     createMockVisualWithDocument,
     TestDocument,
@@ -280,7 +281,7 @@ describe("CreateSketch", () => {
         });
         const document = new TestDocument({
             application: app,
-            selection: { clearSelection } as any,
+            selection: { ...createMockSelection(), clearSelection },
             picker: { pickAsync } as any,
         });
         let body!: ParametricBodyNode;

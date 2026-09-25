@@ -4,6 +4,8 @@
 import {
     AsyncController,
     BoundingBox,
+    type IPicker,
+    type IShape,
     Matrix4,
     Plane,
     PubSub,
@@ -12,7 +14,7 @@ import {
     ShapeTypes,
     XYZ,
 } from "@chili3d/core";
-import { createMockApplication, TestDocument } from "@chili3d/core/test-utils";
+import { createMockApplication, createMockSelection, TestDocument } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
 import { RevolveFeatureCommand } from "../../src/commands/revolveCommand";
 import type { RevolveFeatureData } from "../../src/features/feature";
@@ -173,30 +175,42 @@ describe("RevolveFeatureCommand axis step", () => {
         return steps[1];
     }
 
-    test("the axis step picks a single edge and keeps the sketch selected", () => {
-        const step = axisStep() as any;
-        expect(step.snapeType).toBe(ShapeTypes.edge);
-        expect(step.prompt).toBe("prompt.select.axis");
-        expect(step.options.keepSelection).toBe(true);
-        expect(step.options.multiple).toBeUndefined();
+    async function axisPickOptions() {
+        const clearSelection = rs.fn();
+        doc.selection = { ...createMockSelection(), clearSelection };
+        const pickShape = rs.fn(async (..._args: Parameters<IPicker["pickShape"]>) => []);
+        doc.picker = { pickShape } as any;
+        await axisStep().execute(doc, new AsyncController());
+        expect(pickShape).toHaveBeenCalledTimes(1);
+        expect(pickShape.mock.calls[0][2]).not.toBeUndefined();
+        return { prompt: pickShape.mock.calls[0][0], options: pickShape.mock.calls[0][2]!, clearSelection };
+    }
+
+    test("the axis step picks a single edge and keeps the sketch selected", async () => {
+        const { prompt, options, clearSelection } = await axisPickOptions();
+        expect(options.shapeType).toBe(ShapeTypes.edge);
+        expect(prompt).toBe("prompt.select.axis");
+        expect(clearSelection).not.toHaveBeenCalled();
+        expect(options.multi).toBeUndefined();
     });
 
-    test("the axis step accepts line edges of any node, not just the sketch", () => {
-        const step = axisStep() as any;
-        expect(step.options.nodeFilter).toBeUndefined();
+    test("the axis step accepts line edges of any node, not just the sketch", async () => {
+        const { options } = await axisPickOptions();
+        expect(options.nodeFilter).toBeUndefined();
     });
 
-    test("the axis step accepts only line edges", () => {
-        const step = axisStep() as any;
-        const allow = step.options.shapeFilter.allow;
+    test("the axis step accepts only line edges", async () => {
+        const { options } = await axisPickOptions();
+        expect(options.shapeFilter).not.toBeUndefined();
+        const allow = options.shapeFilter!.allow;
         const lineEdge = { shapeType: ShapeTypes.edge, curve: { basisCurve: { direction: XYZ.unitY } } };
         const circleEdge = {
             shapeType: ShapeTypes.edge,
             curve: { basisCurve: { center: XYZ.zero, radius: 5 } },
         };
-        expect(allow(lineEdge, Matrix4.identity())).toBe(true);
-        expect(allow(circleEdge, Matrix4.identity())).toBe(false);
-        expect(allow({ shapeType: ShapeTypes.face }, Matrix4.identity())).toBe(false);
+        expect(allow(lineEdge as unknown as IShape, Matrix4.identity())).toBe(true);
+        expect(allow(circleEdge as unknown as IShape, Matrix4.identity())).toBe(false);
+        expect(allow({ shapeType: ShapeTypes.face } as IShape, Matrix4.identity())).toBe(false);
     });
 });
 

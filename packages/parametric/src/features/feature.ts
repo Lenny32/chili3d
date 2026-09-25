@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type ConstructionRef,
     type FeatureParameter,
     type I18nKeys,
     type IDocument,
@@ -84,6 +85,8 @@ export interface RevolveFeatureData extends FeatureBase {
      * axis line moves the revolve, like the axis reference in mainstream parametric CAD.
      */
     readonly axisSource?: { readonly nodeId: string; readonly edge: EdgeRef };
+    /** Persistent construction axis; invalid refs fail the revolve instead of using its snapshot. */
+    readonly constructionAxisRef?: ConstructionRef;
     /** In degrees. */
     readonly angle: ParameterValue;
     /**

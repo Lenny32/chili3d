@@ -269,23 +269,23 @@ export class ThreeGeometry extends ThreeVisualObject implements IVisualGeometry 
         if (shapeType === "vertex") {
             groups = this.geometryNode.mesh.vertexs?.range;
             if (groups) {
-                index = ThreeHelper.findGroupIndex(groups, subVisualIndex)!;
-                subShape = groups[index].shape;
-                transform = groups[index].transform;
+                index = ThreeHelper.findGroupIndex(groups, subVisualIndex) ?? -1;
+                subShape = groups[index]?.shape;
+                transform = groups[index]?.transform;
             }
         } else if (shapeType === "edge") {
             groups = this.geometryNode.mesh.edges?.range;
             if (groups) {
-                index = ThreeHelper.findGroupIndex(groups, subVisualIndex)!;
-                subShape = groups[index].shape;
-                transform = groups[index].transform;
+                index = ThreeHelper.findGroupIndex(groups, subVisualIndex) ?? -1;
+                subShape = groups[index]?.shape;
+                transform = groups[index]?.transform;
             }
         } else {
             groups = this.geometryNode.mesh.faces?.range;
             if (groups) {
-                index = ThreeHelper.findGroupIndex(groups, subVisualIndex)!;
-                subShape = groups[index].shape;
-                transform = groups[index].transform;
+                index = ThreeHelper.findGroupIndex(groups, subVisualIndex) ?? -1;
+                subShape = groups[index]?.shape;
+                transform = groups[index]?.transform;
             }
         }
 

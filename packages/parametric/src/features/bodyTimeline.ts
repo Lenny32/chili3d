@@ -17,6 +17,7 @@ import { idIsShared, indexesOfOverlappingId } from "./trackedId";
 /** Snapshot of one referenced node, used to decide whether a cached entry is still valid. */
 export interface RefSnapshot {
     readonly shape: Result<IShape> | undefined;
+    readonly datumJson?: string;
     /** World transform at capture time — moving a reference must bust the cache too. */
     readonly transform: Matrix4 | undefined;
 }

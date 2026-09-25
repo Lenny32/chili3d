@@ -2,8 +2,10 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    ConstructionNode,
     FolderNode,
     GroupNode,
+    I18n,
     type IDocument,
     type IFeatureListNode,
     type INode,
@@ -13,9 +15,10 @@ import {
     Node,
     PropertyUtils,
     PubSub,
+    Transaction,
     VisualNode,
 } from "@chili3d/core";
-import { div, Expander, label } from "@chili3d/element";
+import { button, div, Expander, input, label } from "@chili3d/element";
 import { propertyControl } from "./complexPropertyUtils";
 import { FeatureListProperty } from "./featureListProperty";
 import { MatrixProperty } from "./matrixProperty";
@@ -51,6 +54,7 @@ export class PropertyView extends HTMLElement {
         this.addModel(document, nodes);
         this.addGeometry(nodes, document);
         this.addFeatureList(document, nodes);
+        this.addConstructionEditor(nodes);
     };
 
     private removeProperties() {
@@ -110,6 +114,72 @@ export class PropertyView extends HTMLElement {
             new FeatureListProperty(document, nodes[0] as INode & IFeatureListNode),
         );
         this.panel.append(features);
+    }
+
+    private addConstructionEditor(nodes: INode[]) {
+        if (nodes.length !== 1 || !(nodes[0] instanceof ConstructionNode)) return;
+        const node = nodes[0];
+        this.panel.append(
+            button({
+                textContent: new Localize("construction.edit"),
+                onclick: () => PubSub.default.pub("executeCommand", "construct.edit"),
+            }),
+        );
+        if (node.errorMessage) {
+            this.panel.append(
+                div({
+                    role: "alert",
+                    textContent: I18n.translate("construction.invalid{0}", node.errorMessage),
+                }),
+            );
+        }
+        this.panel.append(
+            label({ textContent: new Localize("construction.displaySize") }),
+            input({
+                type: "number",
+                min: "1",
+                step: "any",
+                value: String(node.displaySize),
+                onchange: (event) => {
+                    const size = Number((event.target as HTMLInputElement).value);
+                    if (!Number.isFinite(size) || size <= 0) return;
+                    Transaction.execute(node.document, "edit construction display", () => {
+                        node.displaySize = size;
+                        node.document.visual.update();
+                    });
+                },
+            }),
+        );
+        if (node.definition.kind.startsWith("plane-")) {
+            this.panel.append(
+                button({
+                    textContent: new Localize("construction.activatePlane"),
+                    onclick: () => PubSub.default.pub("executeCommand", "construct.activatePlane"),
+                }),
+            );
+            this.panel.append(
+                button({
+                    textContent: new Localize("construction.createSketch"),
+                    onclick: () => PubSub.default.pub("executeCommand", "sketch.create"),
+                }),
+            );
+        }
+        if (node.definition.kind === "ucs") {
+            for (const member of ["XY", "YZ", "ZX"] as const) {
+                this.panel.append(
+                    button({
+                        textContent: new Localize(`construction.activate${member}`),
+                        onclick: () => PubSub.default.pub("executeCommand", `construct.activate${member}`),
+                    }),
+                );
+                this.panel.append(
+                    button({
+                        textContent: new Localize(`construction.createSketch${member}`),
+                        onclick: () => PubSub.default.pub("executeCommand", `sketch.createUcs${member}`),
+                    }),
+                );
+            }
+        }
     }
 
     private isAllElementsOfTypeFirstElement(arr: any[]): boolean {

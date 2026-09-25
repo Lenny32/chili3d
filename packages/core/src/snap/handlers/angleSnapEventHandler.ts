@@ -43,6 +43,11 @@ export class AngleSnapEventHandler extends SnapEventHandler<PointSnapData> {
         return `${this.planeAngle.angle.toFixed(2)} °`;
     };
 
+    /** Degrees, not a length: the project unit does not apply. */
+    protected override normalizeInput(text: string): string {
+        return text;
+    }
+
     protected override inputError(text: string) {
         const angle = Number.parseFloat(text);
         return isNaN(angle) ? "error.input.invalidNumber" : undefined;

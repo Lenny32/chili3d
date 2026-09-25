@@ -4,6 +4,8 @@
 import {
     Config,
     command,
+    documentLengthUnit,
+    formatLength,
     type GeometryNode,
     type IStep,
     LengthAtPlaneStep,
@@ -50,7 +52,8 @@ export abstract class RectCommandBase extends CreateCommand {
             validator: this.handleValid,
             prompt: (snaped: SnapResult) => {
                 const data = this.rectDataFromTemp(snaped.point!);
-                return `${Math.abs(data.dx).toFixed(2)}, ${Math.abs(data.dy).toFixed(2)}`;
+                const unit = documentLengthUnit(this.document);
+                return `${formatLength(Math.abs(data.dx), unit)}, ${formatLength(Math.abs(data.dy), unit)}`;
             },
         };
     };

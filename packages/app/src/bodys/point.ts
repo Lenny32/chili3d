@@ -25,7 +25,7 @@ export class PointNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("point.position")
+    @property("point.position", { quantity: "length" })
     get position() {
         return this.getPrivateValue("position");
     }

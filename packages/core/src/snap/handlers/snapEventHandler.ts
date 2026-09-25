@@ -7,6 +7,8 @@ import { type AsyncController, type MessageType, PubSub, Result } from "../../fo
 import type { I18nKeys } from "../../i18n";
 import type { XYZ } from "../../math";
 import { MeshDataUtils, type ShapeType, ShapeTypes } from "../../shape";
+import { formatLength, parseLength } from "../../units/lengthUnit";
+import { documentLengthUnit } from "../../units/projectSettings";
 import { type IEventHandler, type IView, type MeshOption, screenDistance } from "../../visual";
 import type { ISnap, MouseAndDetected, SnapData, SnapResult } from "../snap";
 
@@ -184,7 +186,7 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
     }
 
     protected formatSnapDistance(num: number) {
-        return num.toFixed(2);
+        return formatLength(num, documentLengthUnit(this.document));
     }
 
     private removeTempVisuals() {
@@ -268,7 +270,8 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
         if (!["#", "-", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(event.key)) return;
 
         this._state = "inputing";
-        PubSub.default.pub("showInput", event.key, (text: string) => {
+        PubSub.default.pub("showInput", event.key, (typed: string) => {
+            const text = this.normalizeInput(typed);
             const error = this.inputError(text);
             if (error) return Result.err(error);
 
@@ -276,6 +279,27 @@ export abstract class SnapEventHandler<D extends SnapData = SnapData> implements
             this.handleSuccess();
             return Result.ok(text);
         });
+    }
+
+    /**
+     * Typed input as the handler reads it: millimetres. Each comma-separated number is taken in
+     * the project unit, or in its own explicit unit (`1in`), and rewritten as millimetres; the
+     * `#` absolute-coordinate prefix is kept. A token that is not a length stays as typed, so
+     * the handler's own validation reports it. Handlers whose input is not a length override
+     * this to read the text as it is.
+     */
+    protected normalizeInput(text: string): string {
+        const unit = documentLengthUnit(this.document);
+        const absolute = text.startsWith("#");
+        const body = absolute ? text.slice(1) : text;
+        const converted = body
+            .split(",")
+            .map((token) => {
+                const millimetres = parseLength(token, unit);
+                return millimetres.isOk ? String(millimetres.value) : token;
+            })
+            .join(",");
+        return absolute ? `#${converted}` : converted;
     }
 
     protected abstract getPointFromInput(view: IView, text: string): SnapResult;

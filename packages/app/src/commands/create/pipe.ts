@@ -22,7 +22,7 @@ import { PipeNode } from "../../bodys";
     icon: "icon-pipe",
 })
 export class Pipe extends MultistepCommand {
-    @property("circle.radius")
+    @property("circle.radius", { quantity: "length" })
     get radius() {
         return this.getPrivateValue("radius", 5);
     }

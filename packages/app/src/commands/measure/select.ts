@@ -7,6 +7,8 @@ import {
     CancelableCommand,
     Combobox,
     command,
+    documentLengthUnit,
+    formatMeasure,
     type I18nKeys,
     type IDisposable,
     type IEdge,
@@ -62,6 +64,16 @@ export class SelectMeasure extends CancelableCommand {
         this.#sum = 0;
     };
 
+    /** What the chosen type measures: a length, an area or a volume. */
+    private get dimension(): 1 | 2 | 3 {
+        return this.category === "common.area" ? 2 : this.category === "common.volume" ? 3 : 1;
+    }
+
+    /** A measured value (mm, mm² or mm³) in the project unit. */
+    private format(value: number, dimension: 1 | 2 | 3, suffix = false): string {
+        return formatMeasure(value, dimension, documentLengthUnit(this.document), { suffix });
+    }
+
     private initSumUI() {
         if (this.#sumUI) {
             this.#sumUI.container.remove();
@@ -73,7 +85,7 @@ export class SelectMeasure extends CancelableCommand {
             header: h1({ textContent: new Localize(this.category) }),
             list: ul(),
             value: span({
-                textContent: "0.00",
+                textContent: this.format(0, this.dimension, true),
             }),
         };
         this.#sumUI.container.append(this.#sumUI.header, this.#sumUI.list, h2(this.#sumUI.value));
@@ -88,9 +100,9 @@ export class SelectMeasure extends CancelableCommand {
         }
 
         const li = document.createElement("li");
-        li.textContent = item.toFixed(2);
+        li.textContent = this.format(item, this.dimension);
         this.#sumUI!.list.append(li);
-        this.#sumUI!.value.textContent = this.#sum.toFixed(2);
+        this.#sumUI!.value.textContent = this.format(this.#sum, this.dimension, true);
     }
 
     protected override afterExecute(): void {
@@ -152,12 +164,16 @@ export class SelectMeasure extends CancelableCommand {
 
         const id = this.document.visual.context.displayMesh([mesh]);
         this.#disposeSet.add(
-            this.application.activeView!.htmlText(length.toFixed(2), start.add(end).multiply(0.5), {
-                hideDelete: true,
-                onDispose: () => {
-                    this.document.visual.context.removeMesh(id);
+            this.application.activeView!.htmlText(
+                this.format(length, 1, true),
+                start.add(end).multiply(0.5),
+                {
+                    hideDelete: true,
+                    onDispose: () => {
+                        this.document.visual.context.removeMesh(id);
+                    },
                 },
-            }),
+            ),
         );
     }
 
@@ -174,7 +190,7 @@ export class SelectMeasure extends CancelableCommand {
         const center = this.wireCenter(mesh.position);
         const id = this.document.visual.context.displayMesh([mesh]);
         this.#disposeSet.add(
-            this.application.activeView!.htmlText(area.toFixed(2), center, {
+            this.application.activeView!.htmlText(this.format(area, 2, true), center, {
                 hideDelete: true,
                 onDispose: () => {
                     this.document.visual.context.removeMesh(id);
@@ -208,7 +224,7 @@ export class SelectMeasure extends CancelableCommand {
         this.addSumItem(volume);
         const id = this.document.visual.context.displayMesh([mesh]);
         this.#disposeSet.add(
-            this.application.activeView!.htmlText(volume.toFixed(2), transform.ofPoint(center), {
+            this.application.activeView!.htmlText(this.format(volume, 3, true), transform.ofPoint(center), {
                 hideDelete: true,
                 onDispose: () => {
                     this.document.visual.context.removeMesh(id);

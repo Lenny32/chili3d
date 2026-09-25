@@ -119,6 +119,12 @@
     margin-top: 6px;
 }
 
+.lengthInput {
+    display: flex;
+    flex: 1;
+    align-items: center;
+}
+
 /* A referenced node's name is a link into that node: click selects, double-click edits. */
 .reference {
     flex: 1 1 auto;

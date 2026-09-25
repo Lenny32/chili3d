@@ -4,17 +4,22 @@
 import {
     type AsyncController,
     type CameraType,
+    documentLengthUnit,
+    formatLengthParameter,
     type I18nKeys,
     type IDisposable,
     type IDocument,
     type IEventHandler,
     type IView,
+    LENGTH_UNITS,
+    lengthParameterFromInput,
     type ParameterValue,
     PubSub,
     resolveUnitSpec,
     type Scope,
     Transaction,
     type UnitSpec,
+    unitSpecEquals,
     type XYZ,
 } from "@chili3d/core";
 import type { ParametricBodyNode } from "../../parametricBodyNode";
@@ -743,10 +748,18 @@ export class SketchEditor implements IDisposable {
         onCancel?: () => void,
         options?: { positiveOnly?: boolean },
     ): void {
-        datumPrompt.promptDatum(initial, apply, () => this.applyDatum(), onCancel, {
-            ...options,
-            resolve: (input) => resolveUnitSpec(input, this.variableScope(), unit),
-        });
+        const input = this.datumInput(unit);
+        datumPrompt.promptDatum(
+            input.display(initial),
+            (value) => apply(input.store(value, initial)),
+            () => this.applyDatum(),
+            onCancel,
+            {
+                ...options,
+                unit: input.unitLabel,
+                resolve: (value) => resolveUnitSpec(input.store(value, initial), this.variableScope(), unit),
+            },
+        );
     }
 
     /** Two-value variant of `promptDatum` for multi-datum constraints (Fix = X, Y). */
@@ -755,10 +768,42 @@ export class SketchEditor implements IDisposable {
         apply: (x: ParameterValue, y: ParameterValue) => void,
         unit: UnitSpec,
     ): void {
-        datumPrompt.promptDatumPair(initial, apply, () => this.applyDatum(), {
-            positiveOnly: false,
-            resolve: (input) => resolveUnitSpec(input, this.variableScope(), unit),
-        });
+        const input = this.datumInput(unit);
+        datumPrompt.promptDatumPair(
+            [input.display(initial[0]), input.display(initial[1])],
+            (x, y) => apply(input.store(x, initial[0]), input.store(y, initial[1])),
+            () => this.applyDatum(),
+            {
+                positiveOnly: false,
+                unit: input.unitLabel,
+                // Each box is judged on its own, so resolve cannot know which initial it edits;
+                // `store` without one only converts, which is all a check needs.
+                resolve: (value) => resolveUnitSpec(input.store(value), this.variableScope(), unit),
+            },
+        );
+    }
+
+    /**
+     * The dialog boundary of a datum: lengths are typed in the project unit while the solver
+     * and the stored datum stay in millimetres. A literal shown and confirmed unchanged hands
+     * back the exact stored value — the shown text is rounded, and re-reading it would drift.
+     * Angles and ratios pass through untouched.
+     */
+    private datumInput(unit: UnitSpec) {
+        const lengthUnit = documentLengthUnit(this.document);
+        const isLength = unitSpecEquals(unit, LENGTH_UNITS) && lengthUnit !== "mm";
+        return {
+            unitLabel: unitSpecEquals(unit, LENGTH_UNITS) ? lengthUnit : undefined,
+            display: (value: ParameterValue): ParameterValue =>
+                isLength ? formatLengthParameter(value, lengthUnit) : value,
+            store: (value: ParameterValue, initial?: ParameterValue): ParameterValue => {
+                if (!isLength) return value;
+                if (initial !== undefined && String(value) === formatLengthParameter(initial, lengthUnit)) {
+                    return initial;
+                }
+                return lengthParameterFromInput(String(value), lengthUnit, this.variableScope());
+            },
+        };
     }
 
     /** What a confirmed datum does to the session, whatever the dialog looked like. */

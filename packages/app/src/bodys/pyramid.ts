@@ -28,7 +28,7 @@ export class PyramidNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dx")
+    @property("box.dx", { quantity: "length" })
     get dx() {
         return this.getPrivateValue("dx");
     }
@@ -37,7 +37,7 @@ export class PyramidNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dy")
+    @property("box.dy", { quantity: "length" })
     get dy() {
         return this.getPrivateValue("dy");
     }
@@ -46,7 +46,7 @@ export class PyramidNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dz")
+    @property("box.dz", { quantity: "length" })
     get dz() {
         return this.getPrivateValue("dz");
     }

@@ -51,8 +51,8 @@ describe("LengthMeasure", () => {
 
             expect(displayMesh).toHaveBeenCalledTimes(1);
             expect(htmlText).toHaveBeenCalledTimes(1);
-            // distance 3-4-5 -> "5.00"
-            expect(htmlText).toHaveBeenCalledWith("5.00", expect.any(Object), expect.any(Object));
+            // distance 3-4-5 -> "5.00 mm" (the project unit, millimetres by default)
+            expect(htmlText).toHaveBeenCalledWith("5.00 mm", expect.any(Object), expect.any(Object));
         });
     });
 

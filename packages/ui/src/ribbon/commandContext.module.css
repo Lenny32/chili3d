@@ -126,6 +126,17 @@
     color: var(--input-text-color);
 }
 
+.unit {
+    margin-left: 4px;
+    opacity: 0.7;
+}
+
+.info {
+    opacity: 0.8;
+    white-space: normal;
+    max-width: 320px;
+}
+
 .select {
     margin-left: 8px;
     padding: 2px 12px;

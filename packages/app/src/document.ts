@@ -19,6 +19,7 @@ import {
     ModelManager,
     Observable,
     ObservableCollection,
+    ProjectSettings,
     PubSub,
     type Serialized,
     Serializer,
@@ -40,6 +41,7 @@ export class Document extends Observable implements IDocument {
     readonly modelManager: ModelManager;
     /** Document-wide parameters shared by every body and sketch. */
     readonly variables: IVariableTable;
+    readonly settings: ProjectSettings;
     userData: Record<string, unknown> = {};
 
     static readonly version = __DOCUMENT_VERSION__;
@@ -63,6 +65,7 @@ export class Document extends Observable implements IDocument {
         this.modelManager = new ModelManager(this);
         this.history = new History();
         this.variables = new VariableTable(this);
+        this.settings = new ProjectSettings(this);
         this.selection = new SelectionManager(this);
         this.picker = new Picker(this);
         this.visual = application.visualFactory.create(this);
@@ -83,6 +86,7 @@ export class Document extends Observable implements IDocument {
             name: this.name,
             models: this.modelManager.serialize(),
             variables: this.variables.items,
+            settings: this.settings.toData(),
             acts: this.acts.map((x) => Serializer.serializeObject(x)),
             userData: this.userData,
         };
@@ -97,6 +101,7 @@ export class Document extends Observable implements IDocument {
         this.visual.dispose();
         this.history.dispose();
         this.variables.dispose();
+        this.settings.dispose();
         this.selection.dispose();
         this.acts.forEach((x) => x.dispose());
         this.acts.clear();
@@ -159,6 +164,8 @@ export class Document extends Observable implements IDocument {
         // Before the models: a body's feature chain resolves its parameters against
         // the table, and deserializing a body rebuilds it.
         document.variables.setItems(data["variables"] ?? []);
+        // Files from before project settings read as the defaults (millimetres).
+        document.settings.load(data["settings"]);
         document.acts.push(...data["acts"].map((x: Serialized) => Serializer.deserializeObject(document, x)));
         if (data["userData"]) {
             document.userData = data["userData"];

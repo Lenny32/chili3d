@@ -5,9 +5,12 @@ import {
     type CommandKeys,
     CommandStore,
     debounce,
+    documentLengthUnit,
     type EdgeMeshData,
+    formatLength,
     type IDisposable,
     type IView,
+    type LengthUnit,
     type ShapeMeshData,
 } from "@chili3d/core";
 import {
@@ -217,6 +220,16 @@ export class SketchAnnotationManager implements IDisposable {
     ) {
         // optional call: mock camera controllers in unit tests may lack the event API
         view.cameraController.onPropertyChanged?.(this.onCameraChanged);
+        view.document.settings?.onPropertyChanged(this.onSettingsChanged);
+    }
+
+    /** Dimension labels read in the project unit; a unit change redraws them. */
+    private readonly onSettingsChanged = (property: string) => {
+        if (property === "lengthUnit") this.refresh();
+    };
+
+    private lengthUnit(): LengthUnit {
+        return documentLengthUnit(this.view.document);
     }
 
     /** True while a datum label is being dragged or follows the cursor for placement. */
@@ -482,7 +495,7 @@ export class SketchAnnotationManager implements IDisposable {
         const prefix = constraint.kind === ConstraintKind.Radius ? "R" : "";
         // An expression reads as written — that is the whole point of naming it.
         this.addBadge(
-            `${prefix}${formatDatum(constraint.kind, constraint.datum ?? 0)}`,
+            `${prefix}${formatDatum(constraint.kind, constraint.datum ?? 0, this.lengthUnit())}`,
             ...geometry.textPosition,
             constraint,
             constraint.refs,
@@ -596,7 +609,7 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         const value = Math.hypot(preview.p2[0] - preview.p1[0], preview.p2[1] - preview.p1[1]);
-        this.addPreviewBadge(value.toFixed(2), geometry.textPosition);
+        this.addPreviewBadge(formatLength(value, this.lengthUnit()), geometry.textPosition);
     }
 
     private previewRadius(
@@ -613,7 +626,7 @@ export class SketchAnnotationManager implements IDisposable {
             px,
         );
         segments.push(...geometry.segments);
-        this.addPreviewBadge(`R${preview.radius.toFixed(2)}`, geometry.textPosition);
+        this.addPreviewBadge(`R${formatLength(preview.radius, this.lengthUnit())}`, geometry.textPosition);
     }
 
     private previewPointLine(
@@ -628,7 +641,7 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         this.addPreviewBadge(
-            pointLineSignedDistance(preview.p, preview.l1, preview.l2).toFixed(2),
+            formatLength(pointLineSignedDistance(preview.p, preview.l1, preview.l2), this.lengthUnit()),
             geometry.textPosition,
         );
     }
@@ -645,7 +658,7 @@ export class SketchAnnotationManager implements IDisposable {
         if (geometry === undefined) return;
         segments.push(...geometry.segments);
         const value = preview.axis === "h" ? preview.p2[0] - preview.p1[0] : preview.p2[1] - preview.p1[1];
-        this.addPreviewBadge(value.toFixed(2), geometry.textPosition);
+        this.addPreviewBadge(formatLength(value, this.lengthUnit()), geometry.textPosition);
     }
 
     private previewAngle(
@@ -678,6 +691,7 @@ export class SketchAnnotationManager implements IDisposable {
         this.disposed = true;
         this.dragCleanup?.();
         this.view.cameraController.removePropertyChanged?.(this.onCameraChanged);
+        this.view.document.settings?.removePropertyChanged(this.onSettingsChanged);
         this.disposeItems();
     }
 

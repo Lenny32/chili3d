@@ -137,3 +137,35 @@ export class ObservableCollectionMock<T = any> {
         this.items.forEach(fn);
     }
 }
+
+/**
+ * The project-unit exports, resolved lazily. A hoisted `require("@chili3d/core")` can snapshot
+ * core before its `units` module has run, which would spread `undefined` over these; deferring
+ * the lookup to the first call reads the fully loaded modules instead.
+ */
+export function unitExportsMock() {
+    const units = () => require("../../../core/src/units");
+    const property = () => require("../../../core/src/property");
+    // Plain values cannot be deferred; `lengthUnit` has no dependency that could still be
+    // initializing, so requiring it directly yields the finished module.
+    const lengthUnit = require("../../../core/src/units/lengthUnit");
+    return {
+        LENGTH_UNITS_LIST: lengthUnit.LENGTH_UNITS_LIST,
+        LENGTH_UNIT_LABELS: lengthUnit.LENGTH_UNIT_LABELS,
+        isLengthUnit: lengthUnit.isLengthUnit,
+        isLengthProperty: (...args: unknown[]) => property().isLengthProperty(...args),
+        documentLengthUnit: (...args: unknown[]) => units().documentLengthUnit(...args),
+        formatLengthForEditing: (...args: unknown[]) => units().formatLengthForEditing(...args),
+        formatLengthParameter: (...args: unknown[]) => units().formatLengthParameter(...args),
+        lengthParameterFromInput: (...args: unknown[]) => units().lengthParameterFromInput(...args),
+        lengthExpressionFromInput: (...args: unknown[]) => units().lengthExpressionFromInput(...args),
+        parseLength: (...args: unknown[]) => units().parseLength(...args),
+        toMillimetres: (...args: unknown[]) => units().toMillimetres(...args),
+        LengthConverter: function LengthConverter(unit: unknown) {
+            return new (units().LengthConverter)(unit);
+        },
+        XYZLengthConverter: function XYZLengthConverter(unit: unknown) {
+            return new (units().XYZLengthConverter)(unit);
+        },
+    };
+}

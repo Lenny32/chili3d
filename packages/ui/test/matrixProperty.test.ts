@@ -25,9 +25,26 @@ describe("TranslationConverter", () => {
 
             const result = converter.convert(matrix);
             expect(result.isOk).toBe(true);
-            expect(result.value).toContain("10.000000");
-            expect(result.value).toContain("20.000000");
-            expect(result.value).toContain("30.000000");
+            expect(result.value).toBe("10, 20, 30");
+        });
+
+        test("should show the translation in the project unit", () => {
+            const matrix = Matrix4.fromTranslation(100, 25.4, -5);
+            const geometry = createMockGeometry(matrix);
+            const converter = new TranslationConverter(geometry as any, () => "cm");
+
+            expect(converter.convert(matrix).value).toBe("10, 2.54, -0.5");
+        });
+
+        test("should read typed coordinates in the project unit, explicit units winning", () => {
+            const matrix = Matrix4.identity();
+            const geometry = createMockGeometry(matrix);
+            const converter = new TranslationConverter(geometry as any, () => "cm");
+
+            const translation = converter.convertBack("1, 2in, 3mm").value.translationPart();
+            expect(translation.x).toBeCloseTo(10);
+            expect(translation.y).toBeCloseTo(50.8);
+            expect(translation.z).toBeCloseTo(3);
         });
 
         test("should extract zero translation", () => {
@@ -37,7 +54,7 @@ describe("TranslationConverter", () => {
 
             const result = converter.convert(matrix);
             expect(result.isOk).toBe(true);
-            expect(result.value).toContain("0.000000");
+            expect(result.value).toBe("0, 0, 0");
         });
 
         test("should extract negative translation", () => {
@@ -46,9 +63,7 @@ describe("TranslationConverter", () => {
             const converter = new TranslationConverter(geometry as any);
 
             const result = converter.convert(matrix);
-            expect(result.value).toContain("-5.000000");
-            expect(result.value).toContain("-10.000000");
-            expect(result.value).toContain("-15.000000");
+            expect(result.value).toBe("-5, -10, -15");
         });
 
         test("should format as comma-separated values", () => {

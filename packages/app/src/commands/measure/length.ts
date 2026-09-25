@@ -4,6 +4,8 @@
 import {
     command,
     Dimensions,
+    documentLengthUnit,
+    formatLength,
     type IStep,
     MultistepCommand,
     type PointSnapData,
@@ -52,7 +54,7 @@ export class LengthMeasure extends MultistepCommand {
             this.meshPoint(secondPoint),
         ]);
         this.application.activeView?.htmlText(
-            distance.toFixed(2),
+            formatLength(distance, documentLengthUnit(this.document), { suffix: true }),
             firstPoint.add(secondPoint).multiply(0.5),
             {
                 onDispose: () => {

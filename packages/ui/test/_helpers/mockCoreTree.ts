@@ -26,11 +26,13 @@ rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
     const {
         BindingMock,
+        LocalizeMock,
         TransactionMock,
         I18nMock,
         isFeatureListNodeMock,
         isNodeIconMock,
         isNodeWarningMock,
+        unitExportsMock,
     } = rs.hoisted(() => require("./coreMocks"));
     class VisualNode {}
     class Annotation {}
@@ -47,10 +49,12 @@ rs.mock("@chili3d/core", () => {
     }
     return {
         ...actual,
+        ...unitExportsMock(),
         AnalysisNode: class AnalysisNode {},
         ShapeNode: class ShapeNode {},
         MeshNode: class MeshNode {},
         Binding: BindingMock,
+        Localize: LocalizeMock,
         Transaction: TransactionMock,
         // The hoisted `actual` snapshots core mid-initialization, so PubSub must be stubbed.
         PubSub: pubSubRecorder.stub,

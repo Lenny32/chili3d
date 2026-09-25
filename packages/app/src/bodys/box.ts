@@ -33,7 +33,7 @@ export class BoxNode extends ParameterShapeNode {
         return this.getPrivateValue("plane");
     }
 
-    @property("common.location")
+    @property("common.location", { quantity: "length" })
     get location() {
         return this.plane.origin;
     }
@@ -42,7 +42,7 @@ export class BoxNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dx")
+    @property("box.dx", { quantity: "length" })
     get dx() {
         return this.getPrivateValue("dx");
     }
@@ -51,7 +51,7 @@ export class BoxNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dy")
+    @property("box.dy", { quantity: "length" })
     get dy() {
         return this.getPrivateValue("dy");
     }
@@ -60,7 +60,7 @@ export class BoxNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dz")
+    @property("box.dz", { quantity: "length" })
     get dz() {
         return this.getPrivateValue("dz");
     }

@@ -2,10 +2,14 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    documentLengthUnit,
+    formatLengthForEditing,
     type GroupNode,
     type IConverter,
     type IDocument,
+    type LengthUnit,
     Matrix4,
+    parseLength,
     Result,
     type VisualNode,
     type XYZLike,
@@ -28,7 +32,8 @@ export class MatrixProperty extends PropertyBase {
             new InputProperty(document, [this.first], {
                 name: "transform",
                 display: "transform.translation",
-                converter: new TranslationConverter(this.first),
+                quantity: "length",
+                converter: new TranslationConverter(this.first, () => documentLengthUnit(document)),
             }),
             new InputProperty(document, [this.first], {
                 name: "transform",
@@ -90,7 +95,31 @@ export abstract class MatrixConverter implements IConverter<Matrix4, string> {
     }
 }
 
+/** The translation, a millimetre offset, shown and typed in the project unit. */
 export class TranslationConverter extends MatrixConverter {
+    constructor(
+        geometry: VisualNode | GroupNode,
+        private readonly unit: () => LengthUnit = () => "mm",
+    ) {
+        super(geometry);
+    }
+
+    override convert(value: Matrix4): Result<string, string> {
+        const unit = this.unit();
+        return Result.ok(
+            this.convertFrom(value)
+                .map((x) => formatLengthForEditing(x, unit))
+                .join(", "),
+        );
+    }
+
+    override convertBack(value: string): Result<Matrix4, string> {
+        const unit = this.unit();
+        const values = value.split(",").map((x) => parseLength(x, unit));
+        if (values.length !== 3 || values.some((x) => !x.isOk)) return Result.err("invalid number of values");
+        return Result.ok(this.convertTo({ x: values[0].value, y: values[1].value, z: values[2].value }));
+    }
+
     protected convertFrom(matrix: Matrix4): [number, number, number] {
         const position = matrix.translationPart();
         return [position.x, position.y, position.z];

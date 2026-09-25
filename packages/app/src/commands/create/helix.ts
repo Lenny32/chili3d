@@ -23,7 +23,7 @@ import { CreateCommand } from "../createCommand";
     icon: "icon-helix",
 })
 export class Helix extends CreateCommand {
-    @property("option.command.pitch")
+    @property("option.command.pitch", { quantity: "length" })
     get pitch() {
         return this.getPrivateValue("pitch", 10);
     }

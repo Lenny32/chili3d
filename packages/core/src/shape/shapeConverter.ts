@@ -4,12 +4,23 @@
 import type { IDocument } from "../document";
 import type { Result } from "../foundation";
 import type { FolderNode } from "../model";
+import type { LengthUnit } from "../units/lengthUnit";
 import type { IShape } from "./shape";
 
+/** Options for the formats that record their length unit (STEP, IGES). */
+export interface CadExportOptions {
+    /**
+     * The unit the file is written in. Shapes are millimetres; the writer scales coordinates
+     * into this unit and records it in the file, so the physical size is preserved.
+     * Millimetres when omitted.
+     */
+    lengthUnit?: LengthUnit;
+}
+
 export interface IShapeConverter {
-    convertToIGES(...shapes: IShape[]): Result<string>;
+    convertToIGES(shapes: IShape[], options?: CadExportOptions): Result<string>;
     convertFromIGES(document: IDocument, iges: Uint8Array): Result<FolderNode>;
-    convertToSTEP(...shapes: IShape[]): Result<string>;
+    convertToSTEP(shapes: IShape[], options?: CadExportOptions): Result<string>;
     convertFromSTEP(document: IDocument, step: Uint8Array): Result<FolderNode>;
     convertToBrep(shape: IShape): Result<string>;
     convertFromBrep(brep: string): Result<IShape>;

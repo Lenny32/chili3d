@@ -26,7 +26,7 @@ export class LineNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("line.start")
+    @property("line.start", { quantity: "length" })
     get start() {
         return this.getPrivateValue("start");
     }
@@ -35,7 +35,7 @@ export class LineNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("line.end")
+    @property("line.end", { quantity: "length" })
     get end() {
         return this.getPrivateValue("end");
     }

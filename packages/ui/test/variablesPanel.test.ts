@@ -155,8 +155,9 @@ describe("showVariablesPanel", () => {
         const width = mustQuery<HTMLInputElement>(rows[0], ".v-value");
         const height = mustQuery<HTMLInputElement>(rows[1], ".v-value");
         const angle = mustQuery<HTMLInputElement>(rows[2], ".v-value");
-        expect(width.value).toBe("50");
-        expect(height.value).toBe("25");
+        // A length reads with its project unit; an angle is a plain number of degrees.
+        expect(width.value).toBe("50 mm");
+        expect(height.value).toBe("25 mm");
         expect(angle.value).toBe("45");
         // The cell shows what the expression came to; hovering reveals the expression itself.
         expect(height.title).toBe("w / 2");

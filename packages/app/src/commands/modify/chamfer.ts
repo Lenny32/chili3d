@@ -9,7 +9,7 @@ import { EdgeCornerCommand } from "./edgeCornerCommand";
     icon: "icon-chamfer",
 })
 export class ChamferCommand extends EdgeCornerCommand {
-    @property("common.length")
+    @property("common.length", { quantity: "length" })
     get length() {
         return this.getPrivateValue("length", 10);
     }

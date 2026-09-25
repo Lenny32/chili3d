@@ -43,6 +43,8 @@ export function promptDatum(
         positiveOnly?: boolean;
         /** Resolves an input to its display value — supplied by the editor, error text included. */
         resolve?: (input: ParameterValue) => Result<number>;
+        /** The unit the value is typed in, shown beside the box (`cm`). */
+        unit?: string;
     },
 ): void {
     const textbox = document.createElement("input");
@@ -50,7 +52,7 @@ export function promptDatum(
     textbox.autofocus = true;
     const error = createErrorLabel();
     const content = document.createElement("div");
-    content.append(textbox, error);
+    content.append(textbox, ...unitLabel(options?.unit), error);
     PubSub.default.pub("showDialog", "dialog.title.enterValue", content, [
         {
             content: "common.confirm",
@@ -106,9 +108,10 @@ export function promptDatumPair(
     options?: {
         positiveOnly?: boolean;
         resolve?: (input: ParameterValue) => Result<number>;
+        unit?: string;
     },
 ): void {
-    const { inputX, inputY, error, content } = createDatumPairInputs(initial);
+    const { inputX, inputY, error, content } = createDatumPairInputs(initial, options?.unit);
     PubSub.default.pub("showDialog", "dialog.title.enterValue", content, [
         {
             content: "common.confirm",
@@ -138,6 +141,15 @@ function invalidNumber(): string {
     return I18n.translate("error.input.invalidNumber") ?? "invalid number";
 }
 
+/** The unit beside a datum box, when the value has one to name. */
+function unitLabel(unit: string | undefined): HTMLElement[] {
+    if (unit === undefined) return [];
+    const label = document.createElement("span");
+    label.textContent = unit;
+    label.style.cssText = "margin-left: 4px; opacity: 0.7;";
+    return [label];
+}
+
 /** The hidden error line the datum prompts reveal when a typed value is rejected. */
 function createErrorLabel(): HTMLLabelElement {
     const error = document.createElement("label");
@@ -151,7 +163,10 @@ function showDatumError(error: HTMLLabelElement, message: string): void {
 }
 
 /** The X/Y number boxes plus the shared error label, wrapped in a dialog body. */
-function createDatumPairInputs(initial: [ParameterValue, ParameterValue]): {
+function createDatumPairInputs(
+    initial: [ParameterValue, ParameterValue],
+    unit?: string,
+): {
     inputX: HTMLInputElement;
     inputY: HTMLInputElement;
     error: HTMLLabelElement;
@@ -164,6 +179,6 @@ function createDatumPairInputs(initial: [ParameterValue, ParameterValue]): {
     inputX.autofocus = true;
     const error = createErrorLabel();
     const content = document.createElement("div");
-    content.append(inputX, inputY, error);
+    content.append(inputX, inputY, ...unitLabel(unit), error);
     return { inputX, inputY, error, content };
 }

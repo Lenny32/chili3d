@@ -9,7 +9,7 @@ import { EdgeCornerCommand } from "./edgeCornerCommand";
     icon: "icon-fillet",
 })
 export class FilletCommand extends EdgeCornerCommand {
-    @property("circle.radius")
+    @property("circle.radius", { quantity: "length" })
     get radius() {
         return this.getPrivateValue("radius", 10);
     }

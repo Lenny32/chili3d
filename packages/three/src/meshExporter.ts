@@ -1,8 +1,8 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type IMeshExporter, Result, type VisualNode } from "@chili3d/core";
-import { Group, Mesh, Object3D } from "three";
+import { type IMeshExporter, type MeshExportOptions, Result, type VisualNode } from "@chili3d/core";
+import { Group, Matrix4, Mesh, Object3D } from "three";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { PLYExporter } from "three/examples/jsm/exporters/PLYExporter.js";
 import { STLExporter } from "three/examples/jsm/exporters/STLExporter.js";
@@ -13,17 +13,17 @@ import type { ThreeVisualContext } from "./threeVisualContext";
 export class ThreeMeshExporter implements IMeshExporter {
     constructor(readonly content: ThreeVisualContext) {}
 
-    exportToStl(nodes: VisualNode[], asciiMode: boolean): Result<BlobPart> {
+    exportToStl(nodes: VisualNode[], asciiMode: boolean, options?: MeshExportOptions): Result<BlobPart> {
         const exporter = new STLExporter();
-        const group = this.parseNodeToGroup(nodes);
+        const group = this.parseNodeToGroup(nodes, options);
         const blob = exporter.parse(group, { binary: !asciiMode });
         this.disposeObject(group);
         return Result.ok(blob as BlobPart);
     }
 
-    exportToPly(nodes: VisualNode[], asciiMode: boolean): Result<BlobPart> {
+    exportToPly(nodes: VisualNode[], asciiMode: boolean, options?: MeshExportOptions): Result<BlobPart> {
         const exporter = new PLYExporter();
-        const group = this.parseNodeToGroup(nodes);
+        const group = this.parseNodeToGroup(nodes, options);
         const blobPart = exporter.parse(group, () => {}, { binary: !asciiMode });
         this.disposeObject(group);
         if (!blobPart) {
@@ -32,9 +32,9 @@ export class ThreeMeshExporter implements IMeshExporter {
         return Result.ok(blobPart);
     }
 
-    exportToObj(nodes: VisualNode[]): Result<BlobPart> {
+    exportToObj(nodes: VisualNode[], options?: MeshExportOptions): Result<BlobPart> {
         const exporter = new OBJExporter();
-        const group = this.parseNodeToGroup(nodes);
+        const group = this.parseNodeToGroup(nodes, options);
         const blobPart = exporter.parse(group);
         this.disposeObject(group);
         return Result.ok(blobPart);
@@ -48,8 +48,15 @@ export class ThreeMeshExporter implements IMeshExporter {
         });
     }
 
-    private parseNodeToGroup(nodes: VisualNode[]) {
+    /**
+     * Clones every mesh into one group. The exporters read each mesh's `matrixWorld` as it is
+     * (the clone copies the original's), so a unit scale is applied there, on top of the
+     * placement it already holds.
+     */
+    private parseNodeToGroup(nodes: VisualNode[], options?: MeshExportOptions) {
         const group = new Group();
+        const scale = options?.scale ?? 1;
+        const scaling = scale === 1 ? undefined : new Matrix4().makeScale(scale, scale, scale);
         nodes.forEach((node) => {
             const visualObject = this.content.getVisual(node);
             if (visualObject instanceof Object3D) {
@@ -58,7 +65,9 @@ export class ThreeMeshExporter implements IMeshExporter {
                         return;
                     }
                     if (child instanceof Mesh) {
-                        group.add(child.clone(false));
+                        const clone = child.clone(false);
+                        if (scaling) clone.matrixWorld.premultiply(scaling);
+                        group.add(clone);
                     }
                 });
             }

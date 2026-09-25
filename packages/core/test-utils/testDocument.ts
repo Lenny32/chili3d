@@ -15,6 +15,7 @@ import {
     type IVisual,
     ModelManager,
     ObservableCollection,
+    ProjectSettings,
     type PropertyChangedHandler,
     type Serialized,
     VariableTable,
@@ -34,6 +35,7 @@ export class TestDocument implements IDocument {
     userData?: Record<string, unknown> | undefined;
     modelManager: ModelManager;
     variables: IVariableTable;
+    settings: ProjectSettings;
     acts: ObservableCollection<Act> = new ObservableCollection<Act>();
 
     onPropertyChanged<K extends keyof this>(_handler: PropertyChangedHandler<this, K>): void {
@@ -82,6 +84,7 @@ export class TestDocument implements IDocument {
         this.application = overrides?.application ?? ({ views: [] } as unknown as IApplication);
         this.modelManager = new ModelManager(this);
         this.variables = new VariableTable(this);
+        this.settings = new ProjectSettings(this);
         this.analyses = new AnalysisManager(this);
     }
 }

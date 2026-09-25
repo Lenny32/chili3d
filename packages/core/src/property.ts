@@ -7,7 +7,8 @@ import type { UnitSpec } from "./parameters/unitSpec";
 import type { Combobox } from "./ui";
 
 /** The controls that are more than a plain value editor; everything else edits by value. */
-export type PropertyType = "color" | "materialId";
+/** `info` is a read-only line of text: the property's value, shown as it is. */
+export type PropertyType = "color" | "materialId" | "info";
 
 export interface Property {
     name: string;
@@ -23,11 +24,23 @@ export interface Property {
      * would read to know whether to show millimetres or degrees.
      */
     unit?: UnitSpec;
+    /**
+     * What a plain value measures, for properties that take no expression: a `"length"`
+     * number or point is stored in millimetres and shown and typed in the project unit.
+     * A property with a length `unit` is a length too — see `isLengthProperty`.
+     */
+    quantity?: "length";
     dependencies?: {
         property: string | number | symbol;
         value: any;
     }[];
     combobox?: Combobox<any>;
+}
+
+/** True when the property holds a length: displayed and typed in the project unit. */
+export function isLengthProperty(property: Property): boolean {
+    if (property.quantity === "length") return true;
+    return property.unit !== undefined && property.unit.length === 1 && property.unit.angle === 0;
 }
 
 const PropertyKeyMap = new Map<object, Map<string | number | symbol, Property>>();

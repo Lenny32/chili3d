@@ -26,7 +26,7 @@ export class SphereNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.center")
+    @property("circle.center", { quantity: "length" })
     get center() {
         return this.getPrivateValue("center");
     }
@@ -35,7 +35,7 @@ export class SphereNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.radius")
+    @property("circle.radius", { quantity: "length" })
     get radius() {
         return this.getPrivateValue("radius");
     }

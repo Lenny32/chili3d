@@ -18,10 +18,13 @@ export const pubSubRecorder = rs.hoisted(() => {
 
 rs.mock("@chili3d/core", () => {
     const actual = rs.hoisted(() => require("@chili3d/core"));
-    const { LocalizeMock, BindingMock, TransactionMock } = rs.hoisted(() => require("./coreMocks"));
+    const { LocalizeMock, BindingMock, TransactionMock, unitExportsMock } = rs.hoisted(() =>
+        require("./coreMocks"),
+    );
 
     return {
         ...actual,
+        ...unitExportsMock(),
         Localize: LocalizeMock,
         Binding: BindingMock,
         Transaction: TransactionMock,

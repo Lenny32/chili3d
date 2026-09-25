@@ -51,7 +51,7 @@ export class ExtrudeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("common.length")
+    @property("common.length", { quantity: "length" })
     get length(): number {
         return this.getPrivateValue("length");
     }

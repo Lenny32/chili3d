@@ -66,6 +66,7 @@ const sharedApp = new Application({
         export: async () => undefined,
         importFormats: () => [],
         exportFormats: () => [],
+        exportUnitHandling: () => ({ kind: "none" }),
     },
 });
 

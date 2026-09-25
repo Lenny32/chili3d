@@ -34,7 +34,7 @@ export class PipeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.radius")
+    @property("circle.radius", { quantity: "length" })
     get radius() {
         return this.getPrivateValue("radius");
     }
@@ -51,7 +51,7 @@ export class PipeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("pipe.bendRadius")
+    @property("pipe.bendRadius", { quantity: "length" })
     get bendRadius() {
         return this.getPrivateValue("bendRadius", 0);
     }
@@ -60,7 +60,7 @@ export class PipeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("option.command.thickness")
+    @property("option.command.thickness", { quantity: "length" })
     get thickness() {
         return this.getPrivateValue("thickness", 0);
     }

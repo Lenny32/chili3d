@@ -3,6 +3,8 @@
 
 import {
     ANGLE_UNITS,
+    ConstructionNode,
+    type ConstructionRef,
     type FeatureItem,
     type IDocument,
     Id,
@@ -18,6 +20,7 @@ import {
     ShapeNode,
     ShapeTypes,
     type UnitSpec,
+    type XYZLike,
 } from "@chili3d/core";
 import { isBodyTrackingNode } from "../features/bodyTracking";
 import { captureEdgeRef } from "../features/edgeRef";
@@ -28,16 +31,27 @@ import type {
     RevolveFeatureData,
 } from "../features/feature";
 import { ParametricBodyNode } from "../parametricBodyNode";
+import { captureFaceBoundaryRefs } from "../sketch/commands/sketchCommands";
 import { captureFaceRef, type PlaneFaceRef, sketchPlaneOfFace } from "../sketch/planeRef";
-import {
-    ConstraintKind,
-    type SketchConstraintData,
-    type SketchData,
-    type SketchEntityData,
-    type SketchEntityType,
-} from "../sketch/sketchModel";
+import { type ExternalRefData, emptySketchData, type SketchData } from "../sketch/sketchModel";
 import { SketchNode } from "../sketch/sketchNode";
-import { SketchSolver } from "../sketch/solver";
+import {
+    type ConstructionProgramHost,
+    describeConstructionGeometry,
+    resolveConstructionAxisRef,
+    resolveConstructionPlaneRef,
+    toConstructionDefinition,
+} from "./constructionProgram";
+import {
+    describeSketch,
+    type SketchAction,
+    type SketchConstraintSpec,
+    type SketchEntitySpec,
+    type SketchNames,
+    type SketchProgramHost,
+    type SketchReport,
+    SketchSession,
+} from "./sketchProgram";
 
 /**
  * A parametric program: an ordered list of sketch and feature operations, driven from a
@@ -53,6 +67,11 @@ import { SketchSolver } from "../sketch/solver";
 
 export type ParametricOp =
     | SketchOp
+    | EditSketchOp
+    | SketchInfoOp
+    | ConstructOp
+    | EditConstructionOp
+    | ConstructionInfoOp
     | ExtrudeOp
     | RevolveOp
     | FilletChamferOp
@@ -64,15 +83,59 @@ export interface SketchOp {
     op: "sketch";
     id: string;
     name?: string;
-    /** A datum plane, or a planar face of an existing node. Defaults to XY. */
-    plane?: "XY" | "YZ" | "ZX" | { nodeId: string; faceIndex: number };
-    entities: { type: SketchEntityType; params: number[] }[];
-    constraints?: {
-        kind: string;
-        refs: { entity: number; point: number }[];
-        datum?: ParameterValue;
-        datums?: ParameterValue[];
-    }[];
+    /**
+     * A datum plane, a planar face of an existing node, or a construction plane (a UCS
+     * plane with `member`). Defaults to XY.
+     */
+    plane?:
+        | "XY"
+        | "YZ"
+        | "ZX"
+        | { nodeId: string; faceIndex: number }
+        | { construction: string; member?: "XY" | "YZ" | "ZX" };
+    /** Entity ids are their 1-based position here. */
+    entities?: SketchEntitySpec[];
+    constraints?: SketchConstraintSpec[];
+    /** Editing actions applied after the entities and constraints (see `SketchAction`). */
+    actions?: SketchAction[];
+}
+
+/** Applies editing actions to an existing sketch (or one built earlier in the program). */
+export interface EditSketchOp {
+    op: "editSketch";
+    id?: string;
+    sketch: string;
+    actions: SketchAction[];
+}
+
+/** Reads a sketch back: entities, constraints, externals and solver status. */
+export interface SketchInfoOp {
+    op: "sketchInfo";
+    id?: string;
+    sketch: string;
+}
+
+/** Creates a construction plane, axis, point or UCS from a `ConstructionDefinition`. */
+export interface ConstructOp {
+    op: "construct";
+    id: string;
+    name?: string;
+    definition: Record<string, unknown>;
+    displaySize?: number;
+}
+
+export interface EditConstructionOp {
+    op: "editConstruction";
+    node: string;
+    definition?: Record<string, unknown>;
+    name?: string;
+    displaySize?: number;
+}
+
+export interface ConstructionInfoOp {
+    op: "constructionInfo";
+    id?: string;
+    node: string;
 }
 
 export interface ExtrudeOp {
@@ -94,7 +157,14 @@ export interface RevolveOp {
     id: string;
     name?: string;
     sketch: string;
-    axis: { point: { x: number; y: number; z: number }; direction: { x: number; y: number; z: number } };
+    /**
+     * A fixed world axis, a construction axis (a UCS axis with `member`), or a linear
+     * edge of a node — both references follow their source on rebuild.
+     */
+    axis:
+        | { point: { x: number; y: number; z: number }; direction: { x: number; y: number; z: number } }
+        | { construction: string; member?: "X" | "Y" | "Z" }
+        | { nodeId: string; edgeIndex: number };
     /** Degrees. Defaults to 360. Always starts a new body — revolve has no join/cut form. */
     angle?: ParameterValue;
 }
@@ -170,6 +240,8 @@ interface State {
     readonly refs: Map<string, string>;
     readonly out: ProgramResult;
     readonly touched: Set<ParametricBodyNode>;
+    /** Entity/constraint names given in this program, per sketch node id. */
+    readonly sketchNames: Map<string, SketchNames>;
 }
 
 /**
@@ -197,6 +269,7 @@ export function runParametricProgram(document: IDocument, ops: readonly Parametr
         refs,
         out: { created: [], bodies: [], consumed: [], results: {} },
         touched: new Set(),
+        sketchNames: new Map(),
     };
     ops.forEach((op, index) => {
         try {
@@ -217,6 +290,26 @@ function runOp(state: State, op: ParametricOp): void {
     switch (op.op) {
         case "sketch":
             runSketchOp(state, op);
+            break;
+        case "editSketch":
+            runEditSketchOp(state, op);
+            break;
+        case "sketchInfo":
+            state.out.results[op.id ?? "sketchInfo"] = describeSketch(
+                resolveSketch(state, op.sketch),
+                state.document.variables.evaluate().scope,
+            );
+            break;
+        case "construct":
+            runConstructOp(state, op);
+            break;
+        case "editConstruction":
+            runEditConstructionOp(state, op);
+            break;
+        case "constructionInfo":
+            state.out.results[op.id ?? "constructionInfo"] = describeConstruction(
+                resolveConstruction(state, op.node),
+            );
             break;
         case "extrude":
             runExtrudeOp(state, op);
@@ -278,30 +371,89 @@ function resolveBody(state: State, ref: unknown): ParametricBodyNode {
 // ------------------------------------------------------------------ Sketch
 
 function runSketchOp(state: State, op: SketchOp): void {
-    const { planeRef, plane, refPositions } = resolveSketchPlane(state, op);
-    const data = buildSketchData(state.document, op, plane);
+    const { planeRef, plane, refPositions, externalRefs, constructionPlaneRef } = resolveSketchPlane(
+        state,
+        op,
+    );
+    const data: SketchData = emptySketchData();
     if (refPositions !== undefined) data.refPositions = refPositions;
+    if (externalRefs !== undefined) {
+        data.externalRefs = externalRefs;
+        // the boundary refs were numbered down from the first external id before any
+        // solver existed — persist the counter, as the interactive create does
+        data.externalIdSeq = Math.min(...externalRefs.map((ref) => ref.entityId)) - 1;
+    }
 
-    const sketch = new SketchNode({ document: state.document, plane, planeRef, data });
+    const sketch = new SketchNode({ document: state.document, plane, planeRef, constructionPlaneRef, data });
     state.document.modelManager.addNode(sketch);
-    // The node builds its edges lazily and reports failure only through `shape` — this
-    // read is both the trigger and the single place a bad sketch can be caught.
-    const shape = sketch.shape;
-    if (!shape.isOk) throw new Error(`the sketch is not usable: ${shape.error}`);
     if (op.name !== undefined) sketch.name = op.name;
-
     state.refs.set(op.id, sketch.id);
     state.out.created.push({ id: op.id, nodeId: sketch.id, name: sketch.name });
+
+    const actions: SketchAction[] = [
+        { action: "add", entities: op.entities ?? [], constraints: op.constraints ?? [] },
+        ...(op.actions ?? []),
+    ];
+    state.out.results[op.id] = editSketch(state, sketch, actions);
 }
 
-function resolveSketchPlane(
-    state: State,
-    op: SketchOp,
-): { plane: Plane; planeRef?: PlaneFaceRef; refPositions?: Record<string, number> } {
+function runEditSketchOp(state: State, op: EditSketchOp): void {
+    if (!Array.isArray(op.actions) || op.actions.length === 0) {
+        throw new Error('"editSketch" requires a non-empty "actions" array');
+    }
+    const sketch = resolveSketch(state, op.sketch);
+    state.out.results[op.id ?? sketch.id] = editSketch(state, sketch, op.actions);
+}
+
+/** One solver session over the sketch; the solved data is stored only when every action succeeded. */
+function editSketch(state: State, sketch: SketchNode, actions: readonly SketchAction[]): SketchReport {
+    let names = state.sketchNames.get(sketch.id);
+    if (names === undefined) {
+        names = { entities: new Map(), constraints: new Map() };
+        state.sketchNames.set(sketch.id, names);
+    }
+    const scope = state.document.variables.evaluate().scope;
+    const session = new SketchSession(programHost(state), sketch, names, scope);
+    try {
+        session.run(actions);
+        const { data, report } = session.finish();
+        sketch.setDataEmitShapeChanged(data);
+        // The node builds its edges lazily and reports failure only through `shape` — this
+        // read is both the trigger and the single place a bad sketch can be caught.
+        const shape = sketch.shape;
+        if (!shape.isOk) throw new Error(`the sketch is not usable: ${shape.error}`);
+        return report;
+    } finally {
+        session.dispose();
+    }
+}
+
+/** The node lookups the sketch and construction halves of the engine share. */
+function programHost(state: State): SketchProgramHost & ConstructionProgramHost {
+    return {
+        document: state.document,
+        resolveNode: (ref, what) => resolveNode(state, ref, what),
+        resolveSketch: (ref) => resolveSketch(state, ref),
+    };
+}
+
+interface ResolvedSketchPlane {
+    plane: Plane;
+    planeRef?: PlaneFaceRef;
+    refPositions?: Record<string, number>;
+    externalRefs?: ExternalRefData[];
+    constructionPlaneRef?: ConstructionRef;
+}
+
+function resolveSketchPlane(state: State, op: SketchOp): ResolvedSketchPlane {
     const picked = op.plane;
     if (picked === undefined || picked === "XY") return { plane: Plane.XY };
     if (picked === "YZ") return { plane: Plane.YZ };
     if (picked === "ZX") return { plane: Plane.ZX };
+    if (typeof picked === "object" && "construction" in picked) {
+        const { ref, plane } = resolveConstructionPlaneRef(programHost(state), picked);
+        return { plane, constructionPlaneRef: ref };
+    }
 
     const host = resolveNode(state, picked.nodeId, "plane host");
     if (!(host instanceof ShapeNode) || !host.shape.isOk) {
@@ -331,68 +483,66 @@ function resolveSketchPlane(
         // timeline there so a later feature moving the face does not drag the plane.
         const refPositions =
             host instanceof ParametricBodyNode ? { [host.id]: host.features.length } : undefined;
-        return { plane: sketchPlaneOfFace(world), planeRef, refPositions };
+        const plane = sketchPlaneOfFace(world);
+        // The face's boundary edges become reference-role externals, as in the interactive create.
+        const externalRefs = captureFaceBoundaryRefs(host, local, transform, plane);
+        return { plane, planeRef, refPositions, externalRefs };
     } finally {
         if (!isIdentity) world.dispose();
     }
 }
 
-function buildSketchData(document: IDocument, op: SketchOp, plane: Plane): SketchData {
-    const entities: SketchEntityData[] = op.entities.map((entity, index) => ({
-        id: index + 1,
-        type: entity.type,
-        params: entity.params,
-    }));
-    const data: SketchData = {
-        entities,
-        constraints: [],
-        // Explicit ids are handed out by index, so the counter has to start past them.
-        entityIdSeq: entities.length + 1,
-    };
-    const constraints = op.constraints ?? [];
-    if (constraints.length === 0) return data;
+// ------------------------------------------------------------------ Construction geometry
 
-    data.constraints = constraints.map((constraint, index) => {
-        const refs = constraint.refs.map((ref) => ({ entityId: ref.entity, pointIndex: ref.point }));
-        const entry: SketchConstraintData = {
-            id: index + 1,
-            kind: parseConstraintKind(constraint.kind),
-            refs,
-        };
-        if (constraint.datum !== undefined) entry.datum = constraint.datum;
-        if (constraint.datums !== undefined) entry.datums = constraint.datums;
-        return entry;
+function runConstructOp(state: State, op: ConstructOp): void {
+    const id = Id.generate();
+    const definition = toConstructionDefinition(programHost(state), op.definition, id);
+    const node = new ConstructionNode({
+        document: state.document,
+        id,
+        definition,
+        ...(op.name !== undefined ? { name: op.name } : {}),
+        ...(op.displaySize !== undefined ? { displaySize: op.displaySize } : {}),
     });
-    return solveSketch(plane, data, document.variables.evaluate().scope);
+    state.document.modelManager.addNode(node);
+    const geometry = node.geometry;
+    if (!geometry.isOk) throw new Error(`the construction does not evaluate: ${geometry.error}`);
+    state.refs.set(op.id, node.id);
+    state.out.created.push({ id: op.id, nodeId: node.id, name: node.name });
+    state.out.results[op.id] = describeConstruction(node);
 }
 
-/**
- * Runs the constraint solver once over freshly built data, returning the solved form.
- * The solver loads (and solves) in its constructor; this only adds the datum-error check
- * the node itself would swallow — an expression that does not resolve would otherwise
- * leave the sketch silently under-solved.
- */
-function solveSketch(plane: Plane, data: SketchData, scope: Scope): SketchData {
-    const solver = new SketchSolver(plane, data, scope);
-    try {
-        solver.solve(true);
-        if (solver.datumErrors.size > 0) {
-            const [id, message] = [...solver.datumErrors][0];
-            throw new Error(`constraint ${id} has an unusable value: ${message}`);
-        }
-        return solver.toData();
-    } finally {
-        solver.dispose();
+function runEditConstructionOp(state: State, op: EditConstructionOp): void {
+    const node = resolveConstruction(state, op.node);
+    if (op.definition !== undefined) {
+        // The setter only toasts an invalid definition — validate here so the program fails.
+        node.definition = toConstructionDefinition(programHost(state), op.definition, node.id);
+        const geometry = node.geometry;
+        if (!geometry.isOk) throw new Error(`the construction does not evaluate: ${geometry.error}`);
     }
+    if (op.name !== undefined) node.name = op.name;
+    if (op.displaySize !== undefined) node.displaySize = op.displaySize;
+    state.out.results[op.node] = describeConstruction(node);
 }
 
-function parseConstraintKind(kind: unknown): ConstraintKind {
-    if (typeof kind === "number" && ConstraintKind[kind] !== undefined) return kind as ConstraintKind;
-    const name = String(kind);
-    const resolved = (ConstraintKind as unknown as Record<string, ConstraintKind | undefined>)[name];
-    if (resolved !== undefined) return resolved;
-    const valid = Object.keys(ConstraintKind).filter((key) => Number.isNaN(Number(key)));
-    throw new Error(`unknown constraint kind "${name}" — valid kinds: ${valid.join(", ")}`);
+function resolveConstruction(state: State, ref: unknown): ConstructionNode {
+    const node = resolveNode(state, ref, "construction");
+    if (!(node instanceof ConstructionNode)) {
+        throw new Error(`"${ref}" is a ${node.constructor.name}, not a construction node`);
+    }
+    return node;
+}
+
+function describeConstruction(node: ConstructionNode) {
+    const geometry = node.geometry;
+    return {
+        nodeId: node.id,
+        name: node.name,
+        definition: node.definition,
+        ...(geometry.isOk
+            ? { geometry: describeConstructionGeometry(geometry.value) }
+            : { error: geometry.error }),
+    };
 }
 
 // ------------------------------------------------------------------ Features
@@ -432,16 +582,13 @@ function runExtrudeOp(state: State, op: ExtrudeOp): void {
 function runRevolveOp(state: State, op: RevolveOp): void {
     const sketch = resolveSketch(state, op.sketch);
     const scope = state.document.variables.evaluate().scope;
-    ensureAxis(op.axis);
     if (op.angle !== undefined) ensureUnit(op.angle, scope, ANGLE_UNITS, "angle");
 
     const feature: RevolveFeatureData = {
         id: Id.generate(),
         type: "revolve",
         sketchId: sketch.id,
-        // A world-space snapshot; without an `axisSource` there is nothing to re-derive
-        // the axis from, and the snapshot is what the handler falls back to anyway.
-        axis: { point: { ...op.axis.point }, direction: { ...op.axis.direction } },
+        ...revolveAxis(state, op.axis),
         angle: op.angle ?? 360,
     };
     createBody(state, op.id, op.name, [feature], () => {
@@ -626,12 +773,57 @@ function ensureUnit(value: ParameterValue, scope: Scope, expected: UnitSpec, wha
     if (!resolved.isOk) throw new Error(`"${what}" is not usable: ${resolved.error}`);
 }
 
-function ensureAxis(axis: RevolveOp["axis"]): void {
+type FixedAxis = Extract<RevolveOp["axis"], { point: unknown }>;
+
+/**
+ * The revolve axis: always a world-space snapshot (what the handler falls back to), plus
+ * the live reference a construction axis or a picked edge contributes.
+ */
+function revolveAxis(
+    state: State,
+    axis: RevolveOp["axis"],
+): Pick<RevolveFeatureData, "axis" | "axisSource" | "constructionAxisRef"> {
+    const plain = (v: XYZLike) => ({ x: v.x, y: v.y, z: v.z });
+    if (axis !== null && typeof axis === "object" && "construction" in axis) {
+        const { ref, point, direction } = resolveConstructionAxisRef(programHost(state), axis);
+        return { axis: { point: plain(point), direction: plain(direction) }, constructionAxisRef: ref };
+    }
+    if (axis !== null && typeof axis === "object" && "nodeId" in axis) {
+        const node = resolveNode(state, axis.nodeId, "axis node");
+        if (!(node instanceof ShapeNode) || !node.shape.isOk) {
+            throw new Error(`node "${axis.nodeId}" has no valid shape to take an axis edge from`);
+        }
+        const edges = node.shape.value.findSubShapes(ShapeTypes.edge) as IEdge[];
+        const edge = edges[axis.edgeIndex];
+        if (edge === undefined) {
+            throw new Error(
+                `edgeIndex ${axis.edgeIndex} is out of range on "${axis.nodeId}" (0..${edges.length - 1})`,
+            );
+        }
+        const transform = node.worldTransform();
+        const start = transform.ofPoint(edge.startPoint());
+        const direction = transform.ofPoint(edge.endPoint()).sub(start).normalize();
+        if (direction === undefined) throw new Error(`edge ${axis.edgeIndex} is degenerate`);
+        const edgeId = isBodyTrackingNode(node) ? node.edgeIdAt(axis.edgeIndex) : undefined;
+        return {
+            axis: { point: plain(start), direction: plain(direction) },
+            // local coordinates, as the interactive pick stores it; re-matched on every rebuild
+            axisSource: { nodeId: node.id, edge: captureEdgeRef(edge, edgeId) },
+        };
+    }
+    ensureAxis(axis);
+    return { axis: { point: { ...axis.point }, direction: { ...axis.direction } } };
+}
+
+function ensureAxis(axis: unknown): asserts axis is FixedAxis {
     const finite = (v: { x: number; y: number; z: number } | undefined) =>
         v !== undefined && [v.x, v.y, v.z].every((n) => typeof n === "number" && Number.isFinite(n));
-    if (!finite(axis?.point) || !finite(axis?.direction)) {
-        throw new Error('"axis" must be { point: {x,y,z}, direction: {x,y,z} } with finite numbers');
+    const candidate = axis as Partial<FixedAxis> | undefined;
+    if (!finite(candidate?.point) || !finite(candidate?.direction)) {
+        throw new Error(
+            '"axis" must be { point: {x,y,z}, direction: {x,y,z} }, { construction, member? } or { nodeId, edgeIndex }',
+        );
     }
-    const { x, y, z } = axis.direction;
+    const { x, y, z } = candidate!.direction!;
     if (x === 0 && y === 0 && z === 0) throw new Error('"axis.direction" must be non-zero');
 }

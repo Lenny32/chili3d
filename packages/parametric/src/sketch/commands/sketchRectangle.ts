@@ -79,7 +79,7 @@ export class SketchRectangleCommand extends SketchMultistepCommand {
     };
 }
 
-function addRectangle(
+export function addRectangle(
     solver: SketchSolver,
     corner1: [number, number],
     corner2: [number, number],

@@ -3,6 +3,7 @@
 
 import { I18n } from "@chili3d/core";
 import { createMockApplication, createMockDocument } from "@chili3d/core/test-utils";
+import { SKETCH_ACTION_NAMES } from "@chili3d/parametric";
 import { rs } from "@rstest/core";
 import { buildTools } from "../src/tools";
 import { buildParametricTools } from "../src/tools/parametricTools";
@@ -37,9 +38,29 @@ describe("parametricTools", () => {
             "boolean",
             "editFeature",
             "features",
+            "editSketch",
+            "sketchInfo",
+            "construct",
+            "editConstruction",
+            "constructionInfo",
         ]);
         expect(opsSchema().required).toEqual(["op"]);
         expect((runParametric().parameters as any).required).toEqual(["ops"]);
+    });
+
+    test("the sketch schema offers every entity type and every engine action", () => {
+        const properties = (opsSchema() as any).properties;
+        expect(properties.entities.items.properties.type.enum).toEqual([
+            "line",
+            "circle",
+            "arc",
+            "point",
+            "ellipse",
+            "spline",
+        ]);
+        expect(properties.entities.items.properties.construction.type).toBe("boolean");
+        // The schema is the only place a client learns an action exists — keep it in step with the engine.
+        expect(properties.actions.items.properties.action.enum).toEqual([...SKETCH_ACTION_NAMES]);
     });
 
     test("returns the no-document error rather than throwing", async () => {

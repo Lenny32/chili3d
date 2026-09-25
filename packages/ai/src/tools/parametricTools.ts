@@ -19,68 +19,210 @@ function loadParametric(): Promise<typeof import("@chili3d/parametric")> {
     return parametricModule;
 }
 
+/** Ops that run the sketch constraint solver, which needs its wasm module loaded first. */
+const SOLVER_OPS = new Set(["sketch", "editSketch", "sketchInfo"]);
+
+const XYZ_SCHEMA = { type: "object", properties: { x: {}, y: {}, z: {} }, required: ["x", "y", "z"] };
+
+const POINT_REF_SCHEMA = {
+    type: "object",
+    properties: {
+        entity: {
+            description:
+                'Entity id (number), a name given earlier in this call, or "origin" / "xAxis" / "yAxis"',
+        },
+        point: { type: "number", description: "Point index within the entity" },
+    },
+    required: ["entity", "point"],
+};
+
+const ENTITY_SCHEMA = {
+    type: "object",
+    properties: {
+        type: { type: "string", enum: ["line", "circle", "arc", "point", "ellipse", "spline"] },
+        params: { type: "array", items: { type: "number" } },
+        points: {
+            type: "array",
+            items: { type: "array", items: { type: "number" } },
+            description:
+                "spline only, instead of params: the interpolation points [[u,v], ...] in curve order",
+        },
+        construction: {
+            type: "boolean",
+            description: "Construction geometry: constrainable, but never part of a profile",
+        },
+        name: { type: "string", description: "Names the entity so later refs in this call can use the name" },
+    },
+    required: ["type"],
+};
+
+const CONSTRAINT_SCHEMA = {
+    type: "object",
+    properties: {
+        kind: {
+            type: "string",
+            description:
+                "Coincident, Horizontal, Vertical, Parallel, Perpendicular, Tangent, Equal, EqualLength, EqualRadius, PointOn, Midpoint, Symmetric, Collinear, Fix, Block, EqualAngle, Scale, HorizontalAlign, VerticalAlign, and the dimensions Distance, HorizontalDistance, VerticalDistance, PointLineDistance, Radius, Angle — or any solver kind name with explicit refs",
+        },
+        entities: {
+            type: "array",
+            description:
+                "The entities the constraint applies to (ids, names, or xAxis/yAxis), as picked in the UI",
+        },
+        points: { type: "array", items: POINT_REF_SCHEMA, description: "The points it applies to" },
+        refs: {
+            type: "array",
+            items: POINT_REF_SCHEMA,
+            description: "Explicit point refs in the solver layout — instead of entities/points",
+        },
+        datum: {
+            description:
+                "Dimension value in mm, degrees (Angle) or a ratio (Scale), or an expression naming document variables. Omit to keep the current measurement.",
+        },
+        datums: { description: "Multi-value datum, e.g. Fix = [u, v]" },
+        direction: {
+            type: "array",
+            items: { type: "number" },
+            description: "Rotated axis [u, v] for H/V kinds",
+        },
+        name: { type: "string", description: "Names the constraint for later setDatum/remove in this call" },
+    },
+    required: ["kind"],
+};
+
+const ACTION_SCHEMA = {
+    type: "object",
+    description:
+        "One sketch edit. load_skill parametric-modeling for every action's fields; coordinates are sketch (u, v) in mm, angles in degrees.",
+    properties: {
+        action: {
+            type: "string",
+            enum: [
+                "add",
+                "rectangle",
+                "polygon",
+                "remove",
+                "setDatum",
+                "setConstruction",
+                "movePoint",
+                "trim",
+                "split",
+                "extend",
+                "offset",
+                "move",
+                "rotate",
+                "mirror",
+                "paste",
+                "projectEdges",
+                "setExternalRole",
+                "autoConstrain",
+                "autoDimension",
+            ],
+        },
+        entities: {
+            type: "array",
+            description: "add: entity specs; otherwise the entity ids/names acted on",
+        },
+        constraints: { type: "array", description: "add: constraint specs; remove: constraint ids/names" },
+        entity: { description: "Entity id or name (movePoint/trim/split/extend/offset)" },
+        point: { type: "number", description: "movePoint: point index" },
+        to: { description: "movePoint: target [u, v]; extend: the boundary entity" },
+        at: {
+            type: "array",
+            items: { type: "number" },
+            description: "trim/split: [u, v] on the piece to act on",
+        },
+        end: { type: "string", enum: ["start", "end"], description: "extend: which end grows (default end)" },
+        distance: {
+            type: "number",
+            description: "offset: signed (+ = left of a line / outward of a circle)",
+        },
+        delta: { type: "array", items: { type: "number" }, description: "move/paste: [du, dv]" },
+        center: { type: "array", items: { type: "number" }, description: "rotate/polygon: [u, v]" },
+        angle: { type: "number", description: "rotate: degrees, counter-clockwise" },
+        axis: { description: "mirror: the mirror line (entity id/name, or xAxis/yAxis)" },
+        copy: {
+            type: "boolean",
+            description: "move/rotate: keep the originals (default false); mirror: default true",
+        },
+        corners: { type: "array", description: "rectangle: [[u1, v1], [u2, v2]]" },
+        rim: {
+            type: "array",
+            items: { type: "number" },
+            description: "polygon: a vertex (or edge midpoint) [u, v]",
+        },
+        sides: { type: "number", description: "polygon: number of sides" },
+        inscribed: { type: "boolean", description: "polygon: rim is a vertex (default) or an edge midpoint" },
+        constraint: { description: "setDatum: constraint id or name" },
+        value: {
+            description: "setDatum: new value (display units) or expression; setConstruction: true/false",
+        },
+        index: { type: "number", description: "setDatum: datum index for multi-datum kinds" },
+        from: { type: "string", description: "paste: the source sketch (op id or node id)" },
+        nodeId: { type: "string", description: "projectEdges: node owning the edges" },
+        edgeIndexes: { type: "array", items: { type: "number" }, description: "projectEdges: edge indexes" },
+        role: { type: "string", enum: ["reference", "profile"], description: "projectEdges/setExternalRole" },
+        names: { type: "array", items: { type: "string" }, description: "projectEdges: a name per edge" },
+        tolerance: { type: "number", description: "autoConstrain: snap distance in mm (default 0.001)" },
+        angleTolerance: {
+            type: "number",
+            description: "autoConstrain: H/V snap angle in degrees (default 5)",
+        },
+        name: { type: "string", description: "rectangle/polygon/offset: name for the created geometry" },
+        construction: { type: "boolean", description: "rectangle: create it as construction geometry" },
+    },
+    required: ["action"],
+};
+
 const OPS_SCHEMA = {
     type: "object",
     properties: {
         op: {
             type: "string",
-            enum: ["sketch", "extrude", "revolve", "fillet", "chamfer", "boolean", "editFeature", "features"],
+            enum: [
+                "sketch",
+                "extrude",
+                "revolve",
+                "fillet",
+                "chamfer",
+                "boolean",
+                "editFeature",
+                "features",
+                "editSketch",
+                "sketchInfo",
+                "construct",
+                "editConstruction",
+                "constructionInfo",
+            ],
             description: "Which operation to run",
         },
         id: {
             type: "string",
             description:
-                "Name for this op's result; later ops reference it. Required for sketch/extrude/revolve.",
+                "Name for this op's result; later ops reference it. Required for sketch/extrude/revolve/construct.",
         },
         name: { type: "string", description: "Optional display name for the resulting node" },
         plane: {
             description:
-                'Sketch plane: "XY" (default), "YZ", "ZX", or { nodeId, faceIndex } to sketch on a planar face of an existing node',
+                'Sketch plane: "XY" (default), "YZ", "ZX", { nodeId, faceIndex } to sketch on a planar face of an existing node, or { construction, member? } for a construction plane (member "XY"/"YZ"/"ZX" picks a UCS plane)',
         },
         entities: {
             type: "array",
             description:
-                "Sketch geometry in sketch (u, v) coordinates: line params [x1,y1,x2,y2]; circle params [cx,cy,r]; arc params [cx,cy,sx,sy,ex,ey] (center, start, end; counter-clockwise). A closed profile needs its points in perimeter order, first point repeated as the last.",
-            items: {
-                type: "object",
-                properties: {
-                    type: { type: "string", enum: ["line", "circle", "arc"] },
-                    params: { type: "array", items: { type: "number" } },
-                },
-                required: ["type", "params"],
-            },
+                "Sketch geometry in sketch (u, v) coordinates: line [x1,y1,x2,y2]; circle [cx,cy,r]; arc [cx,cy,sx,sy,ex,ey] (center, start, end; counter-clockwise); point [x,y]; ellipse [cx,cy,ax,ay,bx,by] (center and two perpendicular axis ends); spline [sx,sy,ex,ey,...interior] or points. Entity ids are the 1-based position in this list. A closed profile needs its points in perimeter order, first point repeated as the last.",
+            items: ENTITY_SCHEMA,
         },
         constraints: {
             type: "array",
             description:
-                "Optional sketch constraints. Omit entirely for a plain sketch of fixed coordinates — constraints are what makes the sketch re-solvable when a dimension changes. Entity ids are the 1-based index of the entity in `entities`; point indexes follow the entity type (line: 0=start 1=end; circle: 0=center; arc: 0=center 1=start 2=end).",
-            items: {
-                type: "object",
-                properties: {
-                    kind: {
-                        type: "string",
-                        description:
-                            "P2PCoincident, Horizontal, Vertical, Parallel, Perpendicular, EqualLength, PointOnLine, Midpoint, Symmetric, TangentLineCircle, P2PDistance, P2LDistance, Angle, Radius, HorizontalDistance, VerticalDistance, Fix, ...",
-                    },
-                    refs: {
-                        type: "array",
-                        items: {
-                            type: "object",
-                            properties: {
-                                entity: { type: "number", description: "1-based entity index" },
-                                point: { type: "number", description: "Point index within the entity" },
-                            },
-                            required: ["entity", "point"],
-                        },
-                    },
-                    datum: {
-                        description:
-                            "Value for dimension constraints (a number, or an expression naming a document parameter)",
-                    },
-                    datums: { description: "Multi-value datum, e.g. Fix = [x, y]" },
-                },
-                required: ["kind", "refs"],
-            },
+                "Optional sketch constraints, applied after the entities. Omit entirely for a plain sketch of fixed coordinates — constraints are what makes the sketch re-solvable when a dimension changes. Point indexes: line 0=start 1=end; circle 0=center; arc 0=center 1=start 2=end; point 0; ellipse 0=center 1/2=axis ends; spline 0=start 1=end.",
+            items: CONSTRAINT_SCHEMA,
+        },
+        actions: {
+            type: "array",
+            items: ACTION_SCHEMA,
+            description:
+                "sketch: edits applied after entities/constraints; editSketch: the edits to apply — every sketch tool (rectangle, polygon, trim, split, extend, offset, move, rotate, mirror, paste, project edges, construction toggle, auto-constrain, auto-dimension, ...)",
         },
         sketch: { type: "string", description: "The sketch op id (or an existing sketch's node id)" },
         depth: { description: "Extrude distance in mm (a number or an expression)" },
@@ -88,12 +230,16 @@ const OPS_SCHEMA = {
         startOffset: { description: "Distance the extrusion starts away from the profile plane" },
         axis: {
             type: "object",
-            description: "Revolve axis in world coordinates",
+            description:
+                "Revolve axis: { point: {x,y,z}, direction: {x,y,z} } in world coordinates, { construction, member? } for a construction axis (member X/Y/Z picks a UCS axis), or { nodeId, edgeIndex } for a linear edge of a node. Both references follow their source when it changes.",
             properties: {
-                point: { type: "object", properties: { x: {}, y: {}, z: {} }, required: ["x", "y", "z"] },
-                direction: { type: "object", properties: { x: {}, y: {}, z: {} }, required: ["x", "y", "z"] },
+                point: XYZ_SCHEMA,
+                direction: XYZ_SCHEMA,
+                construction: { type: "string" },
+                member: { type: "string" },
+                nodeId: { type: "string" },
+                edgeIndex: { type: "number" },
             },
-            required: ["point", "direction"],
         },
         angle: { description: "Revolve angle in degrees (default 360)" },
         body: { type: "string", description: "The body op id (or an existing body's node id)" },
@@ -127,6 +273,16 @@ const OPS_SCHEMA = {
         key: { type: "string", description: 'setParameter: the parameter name, e.g. "depth"' },
         value: { description: "setParameter: the new value; suppress: true/false; rename: the new name" },
         index: { type: "number", description: "moveTo: the feature's absolute index in the list" },
+        definition: {
+            type: "object",
+            description:
+                'construct/editConstruction: { kind, ...fields } — kinds plane-offset, plane-midplane, plane-angle, plane-two-edges, plane-three-points, plane-along-path, plane-tangent, plane-perpendicular, axis-analytic, axis-normal, axis-two-planes, axis-two-points, axis-edge, point-vertex, point-two-edges, point-three-planes, point-center, point-edge-plane, point-along-path, ucs. References: "XY"/"YZ"/"ZX", { datum, member? }, { nodeId, face|edge|vertex: index }, { snap, at }, { path: [...] }, { point: [x,y,z] }, { axis: { origin, direction } }, { facePoint: { nodeId, face }, point }. load_skill parametric-modeling for each kind\'s fields.',
+        },
+        node: {
+            type: "string",
+            description: "editConstruction/constructionInfo: the construction (op id or node id)",
+        },
+        displaySize: { type: "number", description: "construct/editConstruction: display size in mm" },
     },
     required: ["op"],
 };
@@ -144,7 +300,7 @@ export function buildParametricTools(): Tool[] {
         {
             name: "run_parametric",
             description:
-                "Build a parametric body — a sketch plus an ordered feature list the user can re-edit later. Same calling shape as run_program: { ops: [...] }, ops run in order, later ops reference earlier ids, and one call is one undo step. The difference: run_program produces throwaway geometry, run_parametric produces a feature tree the user can change a dimension in afterwards, so use it whenever the model should stay editable and run_program for one-off shapes. Ops: sketch, extrude, revolve, fillet, chamfer, boolean, editFeature, features — load_skill parametric-modeling for the full catalog. Nothing is ever deleted: a boolean's tool nodes become hidden children of the body.",
+                "Build a parametric body — a sketch plus an ordered feature list the user can re-edit later. Same calling shape as run_program: { ops: [...] }, ops run in order, later ops reference earlier ids, and one call is one undo step. The difference: run_program produces throwaway geometry, run_parametric produces a feature tree the user can change a dimension in afterwards, so use it whenever the model should stay editable and run_program for one-off shapes. Ops: sketch, editSketch, sketchInfo, extrude, revolve, fillet, chamfer, boolean, editFeature, features, construct, editConstruction, constructionInfo — every sketch tool and construction-geometry tool of the app is available; load_skill parametric-modeling for the full catalog. Nothing is ever deleted: a boolean's tool nodes become hidden children of the body.",
             parameters: RUN_PARAMETRIC_PARAMETERS,
             handler: runParametric,
         },
@@ -161,14 +317,12 @@ async function runParametric(args: Record<string, unknown>): Promise<string> {
     }
 
     const parametric = await loadParametric();
-    // Only a sketch carrying constraints needs the solver; a plain sketch of fixed
-    // coordinates never touches the solver, so those programs pay nothing for it.
-    const needsSolver = ops.some(
-        (op) =>
-            Array.isArray((op as { constraints?: unknown }).constraints) &&
-            (op as { constraints: unknown[] }).constraints.length > 0,
-    );
-    if (needsSolver) await parametric.initPlaneGcs();
+    // Every sketch op goes through the constraint solver; a program of features alone never loads it.
+    const kinds = new Set(ops.map((op) => (op as { op?: unknown }).op));
+    if ([...kinds].some((kind) => SOLVER_OPS.has(String(kind)))) await parametric.initPlaneGcs();
+    // An open sketch session keeps its own solver and would commit over an edit made
+    // behind its back — close it (committing what the user drew) before editing sketches.
+    if (kinds.has("editSketch")) parametric.SketchEditor.exit();
 
     let result: ProgramResult | undefined;
     // Synchronous by construction: the solver is initialized above, and a throw here

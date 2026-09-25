@@ -1,0 +1,30 @@
+.panel {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 290px;
+    max-height: 65%;
+    overflow: auto;
+    padding: 12px;
+    z-index: 10;
+    color: var(--foreground-color, #ddd);
+    background: var(--background-color, #252525);
+    border: 1px solid #666;
+    border-radius: 6px;
+    font-size: 12px;
+    pointer-events: auto;
+}
+.panel p {
+    margin: 6px 0;
+}
+.panel button {
+    margin: 3px;
+    cursor: pointer;
+}
+.panel label {
+    display: block;
+    margin: 6px 0;
+}
+.issue {
+    border-left: 3px solid #e98a56;
+}

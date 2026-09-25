@@ -68,6 +68,10 @@ const CONSTRAINT_BADGES: Partial<Record<ConstraintKind, { label: string; command
     [ConstraintKind.Symmetric]: { label: "S", command: "constraint.symmetric" },
     [ConstraintKind.HorizontalAlign]: { label: "⬌", command: "constraint.horizontalAlign" },
     [ConstraintKind.VerticalAlign]: { label: "⬍", command: "constraint.verticalAlign" },
+    [ConstraintKind.Collinear]: { label: "COL", command: "constraint.collinear" },
+    [ConstraintKind.Block]: { label: "LOCK", command: "constraint.block" },
+    [ConstraintKind.EqualAngle]: { label: "=∠", command: "constraint.equalAngle" },
+    [ConstraintKind.Scale]: { label: "RATIO", command: "constraint.scale" },
     [ConstraintKind.Fix]: { label: "⚓", command: "constraint.fix" },
 };
 
@@ -176,6 +180,7 @@ export class SketchAnnotationManager implements IDisposable {
     private badgeAnchors: { u: number; v: number; entityIds: number[] }[] = [];
     private meshId?: number;
     private disposed = false;
+    private diagnosticConstraints = new Set<number>();
     private highlightedEntities = new Set<number>();
     private hoveredConstraint?: number;
     private readonly selectedConstraints = new Set<number>();
@@ -717,6 +722,7 @@ export class SketchAnnotationManager implements IDisposable {
         if (this.suppressSymbols) return false;
         return (
             this.hoveredConstraint === constraint.id ||
+            this.diagnosticConstraints.has(constraint.id) ||
             this.selectedConstraints.has(constraint.id) ||
             refs.some((ref) => this.highlightedEntities.has(ref.entityId))
         );
@@ -782,6 +788,7 @@ export class SketchAnnotationManager implements IDisposable {
                     // A datum whose expression stopped resolving keeps its last geometry
                     // (`SketchSolver.datumOf`) — this badge is the only place that says so,
                     // so it carries the reason as its tooltip and reads as broken.
+                    element.classList.toggle(style.diagnostic, this.diagnosticConstraints.has(id));
                     const datumError = this.solver.datumErrors.get(id);
                     if (datumError !== undefined) {
                         element.classList.add(style.error);
@@ -994,6 +1001,18 @@ export class SketchAnnotationManager implements IDisposable {
     }
 
     // ------------------------------------------------------------------ Selection bookkeeping
+
+    selectConstraint(id: number): void {
+        this.toggleSelection(id, false);
+        const constraint = this.solver.toData().constraints.find((c) => c.id === id);
+        this.onHighlightEntities(constraint?.refs.map((r) => r.entityId) ?? []);
+        this.refresh();
+    }
+
+    setDiagnosticConstraints(ids: Set<number>): void {
+        this.diagnosticConstraints = ids;
+        this.refresh();
+    }
 
     private toggleSelection(id: number, additive: boolean): void {
         if (additive) {

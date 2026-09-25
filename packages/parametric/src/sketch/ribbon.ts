@@ -59,6 +59,8 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
                     ["constraint.horizontal", "constraint.vertical", "constraint.midpoint"],
                     ["constraint.parallel", "constraint.perpendicular", "constraint.equal"],
                     ["constraint.tangent", "constraint.symmetric"],
+                    ["constraint.collinear", "constraint.block", "constraint.construction"],
+                    ["constraint.equalAngle", "constraint.scale"],
                     ["constraint.horizontalAlign", "constraint.verticalAlign"],
                 ],
             },
@@ -81,7 +83,7 @@ export const SketchRibbonProfiles: RibbonProfileExtra[] = [
             {
                 groupName: "ribbon.group.finish",
                 primary: true,
-                items: ["sketch.exit"],
+                items: ["sketch.exit", "sketch.autoConstrain"],
             },
         ],
     },

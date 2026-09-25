@@ -153,6 +153,10 @@ export class SketchEventHandler implements IEventHandler {
                 sketchEntityMesh(this.editor, entity, color, ref.role === "profile" ? "solid" : "dash"),
             );
         }
+        for (const entity of this.editor.solver.entities()) {
+            if (entity.construction)
+                meshes.push(sketchEntityMesh(this.editor, entity, ENTITY_POINT_COLOR, "dash"));
+        }
         if (meshes.length === 0) return;
         this.externalDisplayId = view.document.visual.context.displayMesh(meshes, { onTop: true });
     }

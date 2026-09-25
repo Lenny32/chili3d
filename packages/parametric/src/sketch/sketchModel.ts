@@ -11,6 +11,7 @@ import {
     Result,
     resolveUnitSpec,
     type Scope,
+    UNITLESS,
     type UnitSpec,
     type XYZ,
 } from "@chili3d/core";
@@ -79,6 +80,8 @@ export interface SketchConstraintData {
     datum?: ParameterValue;
     /** Datum values for multi-datum kinds (Fix = [x, y]); mutually exclusive with `datum`. */
     datums?: ParameterValue[];
+    /** Independent entity parameter indexes pinned by Block; stable across reloads. */
+    blockedParams?: number[];
     /** Transformed axis for horizontal/vertical relations and projected dimensions. Unit vector in UV. */
     direction?: [number, number];
 }
@@ -88,6 +91,7 @@ export interface SketchConstraintData {
  * resolve to, and what `toDatumSource`/`resolveDatumSource` convert between.
  */
 export function datumUnitSpec(kind: ConstraintKind): UnitSpec {
+    if (kind === ConstraintKind.Scale) return UNITLESS;
     return kind === ConstraintKind.Angle ? ANGLE_UNITS : LENGTH_UNITS;
 }
 
@@ -133,9 +137,17 @@ export function resolveDatumSource(
     source: ParameterValue,
     scope: Scope,
 ): Result<number> {
-    if (typeof source === "number") return Result.ok(source);
+    if (typeof source === "number") {
+        if (kind === ConstraintKind.Scale && (!Number.isFinite(source) || source <= 0)) {
+            return Result.err("Length ratio must be finite and positive");
+        }
+        return Result.ok(source);
+    }
     const resolved = resolveUnitSpec(source, scope, datumUnitSpec(kind));
     if (!resolved.isOk) return Result.err(resolved.error);
+    if (kind === ConstraintKind.Scale && (!Number.isFinite(resolved.value) || resolved.value <= 0)) {
+        return Result.err("Length ratio must be finite and positive");
+    }
     return Result.ok(toStorageDatum(kind, resolved.value));
 }
 
@@ -429,4 +441,27 @@ export function worldPerPixel(view: IView, plane: Plane, x: number, y: number): 
     if (p0 === undefined || p1 === undefined) return undefined;
     const size = p0.distanceTo(p1);
     return size < 1e-12 ? undefined : size;
+}
+
+/** Equations maintaining an entity's own representation must not be user-deletable. */
+export function isStructuralConstraint(
+    c: SketchConstraintData,
+    entities: readonly SketchEntityData[],
+): boolean {
+    if (!c.refs.length || !c.refs.every((r) => r.entityId === c.refs[0].entityId)) return false;
+    const type = entities.find((e) => e.id === c.refs[0].entityId)?.type;
+    return (
+        (type === "arc" && c.kind === ConstraintKind.PointOnArc) ||
+        (type === "ellipse" && c.kind === ConstraintKind.Perpendicular)
+    );
+}
+
+/** Independent coordinates to pin; arc/ellipse structural equations supply the omitted coordinate. */
+export function blockParamIndices(entity: SketchEntityData): number[] {
+    const count = entity.type === "spline" ? 4 : entity.params.length;
+    let omitted = -1;
+    const p = entity.params;
+    if (entity.type === "arc") omitted = Math.abs(p[4] - p[0]) > Math.abs(p[5] - p[1]) ? 4 : 5;
+    if (entity.type === "ellipse") omitted = Math.abs(p[2] - p[0]) > Math.abs(p[3] - p[1]) ? 4 : 5;
+    return Array.from({ length: count }, (_, i) => i).filter((i) => i !== omitted);
 }

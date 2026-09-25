@@ -69,10 +69,22 @@ export enum ConstraintKind {
     TangentArcArc = 26,
     /** c.x, c.y, rad, a.c.x, a.c.y, a.s.x, a.s.y */
     TangentCircleArc = 27,
+    /** Two baseline points followed by points on their common line. */
+    Collinear = 28,
+    /** Entity parameters followed by their frozen values (variable layout). */
+    Block = 29,
+    /** Four directed lines, sharing the angle between each pair. */
+    EqualAngle = 30,
+    /** Two segments and a positive ratio: length(first) = ratio * length(second). */
+    Scale = 31,
 }
 
 /** Param count and trailing datum count of every kind. */
 const LAYOUT: Record<ConstraintKind, { params: number; datums: number }> = {
+    [ConstraintKind.Collinear]: { params: 0, datums: 0 },
+    [ConstraintKind.Block]: { params: 0, datums: 0 },
+    [ConstraintKind.EqualAngle]: { params: 16, datums: 0 },
+    [ConstraintKind.Scale]: { params: 9, datums: 1 },
     [ConstraintKind.P2PCoincident]: { params: 4, datums: 0 },
     [ConstraintKind.P2PDistance]: { params: 5, datums: 1 },
     [ConstraintKind.Equal]: { params: 2, datums: 0 },
@@ -286,7 +298,13 @@ export class SolverSystem {
             if (layout.datums !== 1) throw new Error(`Constraint kind ${kind} does not take a datum value`);
             ids.push(this.pushParam(datum));
         }
-        if (ids.length !== layout.params) {
+        if (kind === ConstraintKind.Collinear && (ids.length < 6 || ids.length % 2 !== 0)) {
+            throw new Error("Collinear requires at least three points");
+        }
+        if (kind === ConstraintKind.Block && (ids.length < 4 || ids.length % 2 !== 0)) {
+            throw new Error("Block requires parameters and matching frozen values");
+        }
+        if (layout.params !== 0 && ids.length !== layout.params) {
             throw new Error(`Constraint kind ${kind} takes ${layout.params} params, got ${ids.length}`);
         }
         for (const id of ids) this.assertParam(id);
@@ -453,6 +471,15 @@ export class SolverSystem {
             return this.pushParam(Math.hypot(sx - cx, sy - cy));
         };
         switch (kind) {
+            case ConstraintKind.EqualAngle: {
+                const [ax, ay] = this.point(ids, 0);
+                const [bx, by] = this.point(ids, 2);
+                const [cx, cy] = this.point(ids, 4);
+                const [dx, dy] = this.point(ids, 6);
+                return [this.pushParam(Math.atan2(dy - cy, dx - cx) - Math.atan2(by - ay, bx - ax))];
+            }
+            case ConstraintKind.Scale:
+                return [radius(0), radius(4)];
             case ConstraintKind.TangentLineArc:
                 return [radius(4)];
             case ConstraintKind.TangentArcArc:
@@ -505,13 +532,13 @@ export class SolverSystem {
         this.structuralDatums = new Set();
         for (const record of this.constraints) {
             if (record === undefined) continue;
-            const { datums } = LAYOUT[record.kind];
+            const datums =
+                record.kind === ConstraintKind.Block ? record.params.length / 2 : LAYOUT[record.kind].datums;
             for (let i = record.params.length - datums; i < record.params.length; i++) {
                 this.datumParams.add(record.params[i]);
             }
-            if (record.kind === ConstraintKind.P2LDistance) {
-                this.structuralDatums.add(record.params[6]);
-            }
+            if (record.kind === ConstraintKind.P2LDistance) this.structuralDatums.add(record.params[6]);
+            if (record.kind === ConstraintKind.Scale) this.structuralDatums.add(record.params[8]);
         }
 
         this.nativeIndex = [];
@@ -640,6 +667,46 @@ class NativeConstraintBuilder {
         const { native, tag } = this;
         const { internal } = this.record;
         switch (this.record.kind) {
+            case ConstraintKind.Collinear:
+                for (let i = 4; i < this.record.params.length; i += 2) {
+                    native.add_constraint_point_on_line_ppp(this.pt(i), this.pt(0), this.pt(2), tag, true, 1);
+                }
+                return;
+            case ConstraintKind.Block: {
+                const count = this.record.params.length / 2;
+                for (let i = 0; i < count; i++) {
+                    native.add_constraint_equal(this.p(i), this.p(i + count), tag, true, 0, 1);
+                }
+                return;
+            }
+            case ConstraintKind.EqualAngle:
+                for (const i of [0, 8]) {
+                    native.add_constraint_l2l_angle_pppp(
+                        this.pt(i),
+                        this.pt(i + 2),
+                        this.pt(i + 4),
+                        this.pt(i + 6),
+                        this.h(0),
+                        tag,
+                        true,
+                        1,
+                    );
+                }
+                return;
+            case ConstraintKind.Scale:
+                native.add_constraint_p2p_distance(this.pt(0), this.pt(2), this.h(0), tag, true, 1);
+                native.add_constraint_p2p_distance(this.pt(4), this.pt(6), this.h(1), tag, true, 1);
+                // The bundled proportional equation is reduced as plain equality by PlaneGCS.
+                // Incidence on y = ratio*x keeps both lengths free and preserves the ratio.
+                native.add_constraint_point_on_line_ppp(
+                    this.track(native.make_point(this.h(1), this.h(0))),
+                    this.track(native.make_point(this.fixedParam(0), this.fixedParam(0))),
+                    this.track(native.make_point(this.fixedParam(1), this.p(8))),
+                    tag,
+                    true,
+                    1,
+                );
+                return;
             case ConstraintKind.P2PCoincident:
                 native.add_constraint_p2p_coincident(this.pt(0), this.pt(2), tag, true, 1);
                 return;

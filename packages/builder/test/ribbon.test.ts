@@ -91,15 +91,15 @@ describe("SketchRibbonProfiles", () => {
         ]);
         const finish = sketchTab.groups.at(-1)!;
         expect(finish.primary).toBe(true);
-        expect(finish.items).toEqual(["sketch.exit"]);
+        expect(finish.items).toEqual(["sketch.exit", "sketch.autoConstrain"]);
         expect(flattenItems(sketchTab.groups[0].items)).toContain("sketch.spline");
     });
 
-    test("constraint group should be icon-only and hold all 13 constraints", () => {
+    test("constraint group should be icon-only and hold all 18 constraint tools", () => {
         const group = findGroup(SketchRibbonProfiles, "ribbon.tab.sketch", "ribbon.group.constraint");
         expect(group.iconOnly).toBe(true);
         const items = flattenItems(group.items);
-        expect(items.length).toBe(13);
+        expect(items.length).toBe(18);
         expect(items.every((x) => x.startsWith("constraint."))).toBe(true);
     });
 

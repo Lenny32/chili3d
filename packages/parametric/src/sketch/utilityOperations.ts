@@ -4,6 +4,7 @@
 import { Result } from "@chili3d/core";
 import {
     axisLineRefs,
+    blockParamIndices,
     ConstraintKind,
     cloneSketchData,
     entityPointCount,
@@ -178,6 +179,14 @@ function transformConstraint(
         const e = entities.find((e) => e.id === ref.entityId)!;
         return e.params.slice(ref.pointIndex * 2, ref.pointIndex * 2 + 2);
     };
+    if (c.kind === ConstraintKind.Block) {
+        const entity = entities.find((e) => e.id === c.refs[0].entityId)!;
+        return Result.ok({
+            ...c,
+            datums: blockParamIndices(entity).map((i) => entity.params[i]),
+            blockedParams: blockParamIndices(entity),
+        });
+    }
     if (c.kind === ConstraintKind.Fix) {
         // Fix follows the transformed point, including parameter-driven coordinates.
         if (!c.datums?.some((d) => typeof d === "string"))

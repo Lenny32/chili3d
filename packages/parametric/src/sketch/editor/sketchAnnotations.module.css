@@ -71,3 +71,7 @@
     cursor: default;
     opacity: 0.7;
 }
+
+.diagnostic {
+    outline: 2px solid #e98a56;
+}

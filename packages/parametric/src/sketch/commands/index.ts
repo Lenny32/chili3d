@@ -22,3 +22,5 @@ import "./sketchPaste";
 import "./sketchMove";
 import "./sketchRotate";
 import "./sketchMirror";
+
+import "./sketchAutoConstrain";

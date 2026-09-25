@@ -61,14 +61,24 @@ source_group ("OCCT" FILES ${OcctSourceFiles})
 
 if (${EMSCRIPTEN})
 
-    add_library(occt STATIC ${OcctSourceFiles})
-    target_include_directories (occt PUBLIC ${OcctIncludeDirs})
-    target_compile_options (occt PUBLIC
-        $<$<CONFIG:Release>:-Oz>
-        $<$<CONFIG:Release>:-flto>
-        $<IF:$<CONFIG:Release>,-sDISABLE_EXCEPTION_CATCHING=1,-sDISABLE_EXCEPTION_CATCHING=0>
-        -DOCCT_NO_PLUGINS
-    )
+    # Local incremental verification only: this archive must come from the same
+    # OCCT source revision and Emscripten release flags as this build. Official
+    # builds leave CHILI_PREBUILT_OCCT unset and compile OCCT from source.
+    if (CHILI_PREBUILT_OCCT)
+        add_library(occt STATIC IMPORTED)
+        set_target_properties(occt PROPERTIES IMPORTED_LOCATION "${CHILI_PREBUILT_OCCT}")
+        target_include_directories(occt INTERFACE ${OcctIncludeDirs})
+        target_compile_definitions(occt INTERFACE OCCT_NO_PLUGINS)
+    else()
+        add_library(occt STATIC ${OcctSourceFiles})
+        target_include_directories (occt PUBLIC ${OcctIncludeDirs})
+        target_compile_options (occt PUBLIC
+            $<$<CONFIG:Release>:-Oz>
+            $<$<CONFIG:Release>:-flto>
+            $<IF:$<CONFIG:Release>,-sDISABLE_EXCEPTION_CATCHING=1,-sDISABLE_EXCEPTION_CATCHING=0>
+            -DOCCT_NO_PLUGINS
+        )
+    endif()
 
     add_executable (${TARGET} ${ChiliWasmSourceFiles})
     target_include_directories (${TARGET} PUBLIC ${OcctIncludeDirs})

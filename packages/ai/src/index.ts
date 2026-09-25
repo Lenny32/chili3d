@@ -3,3 +3,4 @@
 
 export { createMcpPanel, McpPanel } from "./mcp/panel";
 export { bridgeUrlFor, loadMcpSettings } from "./mcp/settings";
+export { type McpConnectionStatus, type McpStateSnapshot, mcpState } from "./mcp/state";

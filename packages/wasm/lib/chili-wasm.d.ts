@@ -516,6 +516,13 @@ export interface TopoDS_Compound extends TopoDS_Shape {
 export interface TopoDS_CompSolid extends TopoDS_Shape {
 }
 
+export type InspectionUVBounds = {
+  u1: number,
+  u2: number,
+  v1: number,
+  v2: number
+};
+
 export interface Shape extends ClassHandle {
 }
 
@@ -564,6 +571,23 @@ export type Vector3 = {
   x: number,
   y: number,
   z: number
+};
+
+export type InspectionDistance = {
+  distance: number,
+  first: Vector3,
+  second: Vector3
+};
+
+export type InspectionMass = {
+  volume: number,
+  center: Vector3
+};
+
+export type InspectionRayResult = {
+  valid: boolean,
+  hasHit: boolean,
+  point: Vector3
 };
 
 export type BoundingBox = {
@@ -863,8 +887,12 @@ interface EmbindModule {
     findSubShapes(_0: TopoDS_Shape, _1: TopAbs_ShapeEnum): Array<TopoDS_Shape>;
     getDirectSubShapes(_0: TopoDS_Shape): Array<TopoDS_Shape>;
     splitShapes(_0: Array<TopoDS_Shape>, _1: Array<TopoDS_Shape>, _2: number): TopoDS_Shape;
+    inspectionCommonVolume(_0: TopoDS_Shape, _1: TopoDS_Shape): number | undefined;
+    inspectionDistance(_0: TopoDS_Shape, _1: TopoDS_Shape): InspectionDistance | undefined;
+    inspectionMass(_0: TopoDS_Shape): InspectionMass | undefined;
     boundingBox(_0: TopoDS_Shape, _1: boolean): BoundingBox;
     orientedBoundingBox(_0: TopoDS_Shape, _1: boolean): OrientedBoundingBox;
+    inspectionSectionCaps(_0: TopoDS_Shape, _1: Pln): TopoDS_Shape;
     sectionSP(_0: TopoDS_Shape, _1: Pln): TopoDS_Shape;
     checkFaces(_0: TopoDS_Shape): FaceCheckResultVector;
   };
@@ -891,12 +919,15 @@ interface EmbindModule {
     edgeLoop(_0: TopoDS_Wire): Array<TopoDS_Edge>;
   };
   Face: {
+    inspectionTrimmedIso(_0: TopoDS_Face, _1: boolean, _2: number): TopoDS_Shape;
+    inspectionUVBounds(_0: TopoDS_Face): InspectionUVBounds | undefined;
     area(_0: TopoDS_Face): number;
     offset(_0: TopoDS_Face, _1: number, _2: GeomAbs_JoinType): TopoDS_Shape;
     outerWire(_0: TopoDS_Face): TopoDS_Wire;
     surface(_0: TopoDS_Face): Handle_Geom_Surface;
     normal(_0: TopoDS_Face, _1: number, _2: number, _3: gp_Pnt, _4: gp_Vec): void;
     curveOnSurface(_0: TopoDS_Face, _1: TopoDS_Edge): Domain;
+    inspectionRayHit(_0: TopoDS_Face, _1: Vector3, _2: Vector3, _3: number, _4: number, _5: number): InspectionRayResult;
     containsPoint(_0: TopoDS_Face, _1: Vector3, _2: boolean, _3: number): boolean;
     intersectLine(_0: TopoDS_Face, _1: Vector3, _2: Vector3, _3: number): Vector3 | undefined;
   };

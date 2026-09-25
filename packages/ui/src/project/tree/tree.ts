@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    AnalysisNode,
     Annotation,
     FolderNode,
     type IDocument,
@@ -42,12 +43,14 @@ export class Tree extends HTMLElement {
     }
 
     connectedCallback() {
+        PubSub.default.sub("analysisDisplayChanged", this.onAnalysisDisplayChanged);
         this.document.modelManager.addNodeObserver(this.handleNodeChanged);
         this.document.modelManager.onPropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.sub(this.handleSelectionChanged);
     }
 
     disconnectedCallback() {
+        PubSub.default.remove("analysisDisplayChanged", this.onAnalysisDisplayChanged);
         this.document.modelManager.removeNodeObserver(this.handleNodeChanged);
         this.document.modelManager.removePropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
@@ -73,6 +76,7 @@ export class Tree extends HTMLElement {
     }
 
     dispose(): void {
+        PubSub.default.remove("analysisDisplayChanged", this.onAnalysisDisplayChanged);
         this.lastClicked = undefined;
         this.dragging = undefined;
         this.highlightedGroup = undefined;
@@ -85,6 +89,10 @@ export class Tree extends HTMLElement {
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
         this.document = null as any;
     }
+
+    private readonly onAnalysisDisplayChanged = (document: IDocument) => {
+        if (document === this.document) this.nodeMap.forEach((item) => item.refreshComponentColor());
+    };
 
     readonly handleNodeChanged = (records: NodeRecord[]) => {
         this.ensureHasHTML(records);
@@ -172,7 +180,7 @@ export class Tree extends HTMLElement {
     private createHTMLElement(document: IDocument, node: INode): TreeItem {
         let result: TreeItem;
         if (NodeUtils.isLinkedListNode(node)) result = new TreeGroup(document, node);
-        else if (node instanceof VisualNode || node instanceof Annotation)
+        else if (node instanceof VisualNode || node instanceof Annotation || node instanceof AnalysisNode)
             result = new TreeModel(document, node);
         else throw new Error("unknown node");
         return result;
@@ -225,6 +233,10 @@ export class Tree extends HTMLElement {
         const node = this.getTreeItem(event.target as HTMLElement)?.node;
         if (node === undefined) return;
         event.stopPropagation();
+        if (node instanceof AnalysisNode) {
+            PubSub.default.pub("showAnalysisPanel", node);
+            return;
+        }
         PubSub.default.pub("nodeDoubleClicked", node);
     };
 

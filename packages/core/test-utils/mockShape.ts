@@ -13,7 +13,7 @@ import type {
     ShapeType,
     XYZLike,
 } from "../src";
-import { Matrix4, type Orientation, ShapeTypes, VisualConfig } from "../src";
+import { Matrix4, type Orientation, Result, ShapeTypes, VisualConfig } from "../src";
 import type { Plane, XYZ } from "../src/math";
 import type { ITrimmedCurve } from "../src/shape/curve";
 import { createMockEdgeCurve } from "./mockCurve";
@@ -29,6 +29,15 @@ export class MockShape implements IShape {
     readonly shapeType: ShapeType;
     private _id: string;
     matrix: Matrix4;
+    inspectionDistance(_other: IShape): Result<{ distance: number; first: XYZ; second: XYZ }> {
+        return Result.err("Distance unavailable in mock");
+    }
+    inspectionCommonVolume(_other: IShape): Result<number> {
+        return Result.err("Common volume unavailable in mock");
+    }
+    inspectionMass(): Result<{ volume: number; center: XYZ }> {
+        return Result.err("Mass properties unavailable in mock");
+    }
     volume(): number {
         return 0;
     }

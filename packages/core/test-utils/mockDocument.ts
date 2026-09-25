@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    AnalysisManager,
     BoundingBox,
     type History,
     type I18nKeys,
@@ -116,12 +117,12 @@ export function createMockDocument(overrides: MockDocumentOverrides = {}): IDocu
         nodes: [],
         materials: [],
         addNode: () => {},
+        addNodeObserver: () => {},
+        removeNodeObserver: () => {},
         findNode: () => undefined,
         findNodes: () => [],
         getChildren: () => [],
         notifyNodeChanged: () => {},
-        addNodeObserver: () => {},
-        removeNodeObserver: () => {},
         dispose: () => {},
         ...overrides.modelManager,
     } as unknown as ModelManager;
@@ -167,6 +168,9 @@ export function createMockDocument(overrides: MockDocumentOverrides = {}): IDocu
         onPropertyChanged: () => {},
         dispose: () => {},
     });
+
+    Object.assign(doc, { analyses: new AnalysisManager(doc) });
+    doc.dispose = () => doc.analyses.dispose();
 
     // patch visual.document to point to this doc
     (visual as any).document = doc;

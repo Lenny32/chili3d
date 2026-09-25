@@ -21,6 +21,7 @@ export class TreeGroup extends TreeItem {
             this.expanderIcon,
             ...(typeIcon === undefined ? [] : [typeIcon]),
             this.name,
+            this.componentSwatch,
             this.visibleIcon,
             this.warningBadge,
         );

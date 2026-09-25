@@ -584,6 +584,38 @@ export const queryCapabilities: QueryCapability[] = [
         params: [{ name: "other", kind: "ref" }],
     },
     {
+        method: "shape.inspectionDistance",
+        name: "inspectionDistance",
+        owner: "shape",
+        family: "shape",
+        returnKind: "data",
+        params: [{ name: "other", kind: "ref" }],
+    },
+    {
+        method: "shape.inspectionCommonVolume",
+        name: "inspectionCommonVolume",
+        owner: "shape",
+        family: "shape",
+        returnKind: "data",
+        params: [{ name: "other", kind: "ref" }],
+    },
+    {
+        method: "shape.inspectionMass",
+        name: "inspectionMass",
+        owner: "shape",
+        family: "shape",
+        returnKind: "data",
+        params: [],
+    },
+    {
+        method: "shape.inspectionSectionCaps",
+        name: "inspectionSectionCaps",
+        owner: "shape",
+        family: "shape",
+        returnKind: "shapeRef",
+        params: [{ name: "plane", kind: "plane" }],
+    },
+    {
         method: "shape.checkShape",
         name: "checkShape",
         owner: "shape",
@@ -790,6 +822,39 @@ export const queryCapabilities: QueryCapability[] = [
         params: [
             { name: "distance", kind: "number" },
             { name: "joinType", kind: "enum", enum: ["arc", "tangent", "intersection"] },
+        ],
+    },
+    {
+        method: "face.inspectionTrimmedIso",
+        name: "inspectionTrimmedIso",
+        owner: "face",
+        family: "shape",
+        returnKind: "shapeRef",
+        params: [
+            { name: "direction", kind: "enum", enum: ["u", "v"] },
+            { name: "parameter", kind: "number" },
+        ],
+    },
+    {
+        method: "face.inspectionUVBounds",
+        name: "inspectionUVBounds",
+        owner: "face",
+        family: "shape",
+        returnKind: "data",
+        params: [],
+    },
+    {
+        method: "face.inspectionRayHit",
+        name: "inspectionRayHit",
+        owner: "face",
+        family: "shape",
+        returnKind: "data",
+        params: [
+            { name: "point", kind: "xyz" },
+            { name: "direction", kind: "xyz" },
+            { name: "minDistance", kind: "number" },
+            { name: "maxDistance", kind: "number" },
+            { name: "tolerance", kind: "number", required: false },
         ],
     },
     { method: "face.area", name: "area", owner: "face", family: "shape", returnKind: "data", params: [] },
@@ -2022,6 +2087,10 @@ shape.* (target must be a shape):
   shape.boundingBox(target) -> BoundingBox
   shape.orientedBoundingBox(target) -> OrientedBoundingBox
   shape.extremaDistance(target, other: ref) -> number
+  shape.inspectionDistance(target, other: ref) -> Result<{ distance: number; first: XYZ; second: XYZ; }, string>
+  shape.inspectionCommonVolume(target, other: ref) -> Result<number, string>
+  shape.inspectionMass(target) -> Result<{ volume: number; center: XYZ; }, string>
+  shape.inspectionSectionCaps(target, plane: plane) -> shape ref (registered under the op id)
   shape.checkShape(target) -> boolean
   shape.checkFaces(target) -> { index: number; isValid: boolean; status: string[]; }[]
   shape.fixShape(target, tolerance: number) -> shape ref (registered under the op id)
@@ -2056,6 +2125,9 @@ wire.* (target must be a wire):
   wire.offset(target, distance: number, joinType: arc|tangent|intersection) -> shape ref (registered under the op id)
 
 face.* (target must be a face):
+  face.inspectionTrimmedIso(target, direction: u|v, parameter: number) -> shape ref (registered under the op id)
+  face.inspectionUVBounds(target) -> Result<{ u1: number; u2: number; v1: number; v2: number; }, string>
+  face.inspectionRayHit(target, point: xyz, direction: xyz, minDistance: number, maxDistance: number, tolerance: number?) -> Result<XYZ | undefined, string>
   face.area(target) -> number
   face.normal(target, u: number, v: number) -> [point: XYZ, normal: XYZ]
   face.outerWire(target) -> shape ref (registered under the op id)

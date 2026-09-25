@@ -44,6 +44,14 @@ export interface IShape extends IDisposable {
     boundingBox(): BoundingBox;
     orientedBoundingBox(): OrientedBoundingBox;
     extremaDistance(other: IShape): number;
+    /** Exact closest points in world coordinates, or an error for missing geometry. */
+    inspectionDistance?(other: IShape): Result<{ distance: number; first: XYZ; second: XYZ }>;
+    /** Volume of the boolean common, in cubic document units; zero also covers touching. */
+    inspectionCommonVolume?(other: IShape): Result<number>;
+    /** Volume and centroid of a valid solid in world coordinates. */
+    inspectionMass?(): Result<{ volume: number; center: XYZ }>;
+    /** Exact planar cap faces of the positive-side cut; empty compound if no cut. */
+    inspectionSectionCaps?(plane: Plane): Result<IShape>;
     checkShape(): boolean;
     checkFaces(): { index: number; isValid: boolean; status: string[] }[];
     fixShape(tolerance: number): IShape;
@@ -102,6 +110,15 @@ export interface IWire extends IShape {
 }
 
 export interface IFace extends IShape {
+    inspectionTrimmedIso?(direction: "u" | "v", parameter: number): IShape | undefined;
+    inspectionUVBounds?(): Result<{ u1: number; u2: number; v1: number; v2: number }>;
+    inspectionRayHit?(
+        point: XYZLike,
+        direction: XYZLike,
+        minDistance: number,
+        maxDistance: number,
+        tolerance?: number,
+    ): Result<XYZ | undefined>;
     area(): number;
     normal(u: number, v: number): [point: XYZ, normal: XYZ];
     outerWire(): IWire;

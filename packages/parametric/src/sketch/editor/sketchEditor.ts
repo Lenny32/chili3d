@@ -66,7 +66,16 @@ import { SolverFeedback } from "./solverFeedback";
  * `sketchAnnotations.ts` (constraint badges and dimension graphics).
  */
 
-export type SketchPickKind = "point" | "entity" | "position";
+export type SketchPickKind = "point" | "entity" | "target" | "position";
+
+/**
+ * What a `pickTarget` click landed on: a point wins over the entity it lies on, and a click
+ * on neither is a plain position.
+ */
+export type SketchPickTarget =
+    | { point: SketchPointRef }
+    | { entityId: number }
+    | { position: [number, number] };
 
 /** Entity type filter for picks: a single type or a set of acceptable types. */
 export type SketchEntityTypeFilter = SketchEntityType | readonly SketchEntityType[];
@@ -490,6 +499,20 @@ export class SketchEditor implements IDisposable {
         return this.startPick("entity", prompt, type, options?.datum, undefined, controller);
     }
 
+    /**
+     * Picks whatever is under the cursor — a point, else an entity of `type`, else the plain
+     * position. The smart-dimension pick: clicking geometry adds it to the dimension, clicking
+     * empty space places the label.
+     */
+    pickTarget(
+        prompt: I18nKeys,
+        type?: SketchEntityTypeFilter,
+        options?: { datum?: boolean; preview?: SketchPickPreview },
+        controller?: AsyncController,
+    ): Promise<SketchPickTarget | undefined> {
+        return this.startPick("target", prompt, type, options?.datum, options?.preview, controller);
+    }
+
     pickPosition(
         prompt: I18nKeys,
         preview?: SketchPickPreview,
@@ -523,6 +546,8 @@ export class SketchEditor implements IDisposable {
             value = this.eventHandler.hitTestPoint(view, event);
         } else if (request.kind === "entity") {
             value = this.eventHandler.hitTestEntity(view, event, request.entityType, request.datum ?? false);
+        } else if (request.kind === "target") {
+            value = this.hitTestTarget(view, event, request);
         } else {
             value = this.eventHandler.pointerToUV(view, event);
         }
@@ -533,6 +558,24 @@ export class SketchEditor implements IDisposable {
             request.resolve(value);
         }
         return true;
+    }
+
+    private hitTestTarget(
+        view: IView,
+        event: PointerEvent,
+        request: PickRequest,
+    ): SketchPickTarget | undefined {
+        const point = this.eventHandler.hitTestPoint(view, event);
+        if (point !== undefined) return { point };
+        const entityId = this.eventHandler.hitTestEntity(
+            view,
+            event,
+            request.entityType,
+            request.datum ?? false,
+        );
+        if (entityId !== undefined) return { entityId };
+        const position = this.eventHandler.pointerToUV(view, event);
+        return position === undefined ? undefined : { position };
     }
 
     // ------------------------------------------------------------------ Solving, commit and deletion

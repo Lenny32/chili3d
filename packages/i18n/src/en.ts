@@ -562,6 +562,10 @@ export default {
         "prompt.pickRadius": "input radius, ESC key to cancel",
         "prompt.pickSketchEntity": "pick a sketch entity, ESC key to cancel",
         "prompt.pickSketchPoint": "pick a sketch point, ESC key to cancel",
+        "prompt.pickSketchPointOrEntity": "pick a line, circle, arc or point to dimension, ESC key to cancel",
+        "prompt.pickSketchPointOrLine": "pick a second point or a line, ESC key to cancel",
+        "prompt.pickDimensionPositionOrEntity":
+            "click to place the dimension, or pick a second item to dimension against, ESC key to cancel",
         "prompt.polygon.close": "Close",
         "prompt.dragToExtrude": "Drag the arrow to set length, click a profile to switch, ESC key to cancel",
         "prompt.saveDocument{0}": "Do you want to save the changes to {0}?",

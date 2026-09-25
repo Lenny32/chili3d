@@ -180,6 +180,245 @@ describe("dimension commands", () => {
         }
     });
 
+    test("distance dimension on a clicked line dimensions its length", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const line = editor.solver.addLine(0, 0, 100, 0);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // the middle of the line (away from both endpoints), then a label position
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 250));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("100.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.P2PDistance);
+            expect(constraints[0].refs).toEqual([
+                { entityId: line, pointIndex: 0 },
+                { entityId: line, pointIndex: 1 },
+            ]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension on a clicked circle dimensions its radius", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            editor.solver.addCircle(0, 0, 30);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // circle rim at world (30, 0) -> screen (430, 300)
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(430, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(500, 250));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("30.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.Radius);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension from a point to a clicked line is a point-line distance", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            editor.solver.addLine(0, 0, 100, 0);
+            editor.solver.addCircle(50, 30, 10);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // circle center (450, 330), the middle of the line, then a label position
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 330));
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(470, 280));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("30.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.P2LDistance);
+            expect(constraints[0].refs).toEqual([
+                { entityId: 2, pointIndex: 0 },
+                { entityId: 1, pointIndex: 0 },
+                { entityId: 1, pointIndex: 1 },
+            ]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension on two clicked lines dimensions their angle", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const horizontal = editor.solver.addLine(0, 0, 100, 0);
+            const vertical = editor.solver.addLine(0, 0, 0, 100);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // the middle of each line (screen (450, 300) and (400, 250)), then a label position
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(400, 250));
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 250));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("90.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.Angle);
+            expect(constraints[0].refs.map((r) => r.entityId)).toEqual([
+                horizontal,
+                horizontal,
+                vertical,
+                vertical,
+            ]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test.each([
+        // between the two lines' drawing directions: the 60° sector
+        { name: "between the lines", x: 470, y: 280, display: "60.00", reversed: [false, false] },
+        // across the second line, towards the reversed first line: the 120° sector
+        { name: "beside the second line", x: 360, y: 270, display: "120.00", reversed: [true, false] },
+        // opposite the 60° sector: 60° again, with both lines reversed
+        { name: "opposite", x: 360, y: 330, display: "60.00", reversed: [true, true] },
+    ])("angle dimension measures the sector the label is placed in ($name)", async ({
+        x,
+        y,
+        display,
+        reversed,
+    }) => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const horizontal = editor.solver.addLine(0, 0, 100, 0);
+            const slanted = editor.solver.addLine(0, 0, 50, 50 * Math.sqrt(3));
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            // the middle of each line: (50, 0) -> screen (450, 300); (25, 43.3) -> (425, 256.7)
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(425, 256.7));
+            await tick();
+            handler.pointerDown(view, pointerEvent(x, y));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe(display);
+            const [constraint] = editor.solver.toData().constraints;
+            expect(constraint.kind).toBe(ConstraintKind.Angle);
+            const order = (id: number, flip: boolean) => [
+                { entityId: id, pointIndex: flip ? 1 : 0 },
+                { entityId: id, pointIndex: flip ? 0 : 1 },
+            ];
+            expect(constraint.refs).toEqual([
+                ...order(horizontal, reversed[0]),
+                ...order(slanted, reversed[1]),
+            ]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension on two parallel lines dimensions the gap between them", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            const bottom = editor.solver.addLine(0, 0, 100, 0);
+            const top = editor.solver.addLine(0, 40, 100, 40);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(450, 260));
+            await tick();
+            handler.pointerDown(view, pointerEvent(520, 280));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("40.00");
+            const constraints = editor.solver.toData().constraints;
+            expect(constraints.length).toBe(1);
+            expect(constraints[0].kind).toBe(ConstraintKind.P2LDistance);
+            expect(constraints[0].refs).toEqual([
+                { entityId: top, pointIndex: 0 },
+                { entityId: bottom, pointIndex: 0 },
+                { entityId: bottom, pointIndex: 1 },
+            ]);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("distance dimension ignores a second click on the line already picked", async () => {
+        const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
+        try {
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            editor.solver.addLine(0, 0, 100, 0);
+            editor.solve(true);
+            const handler = doc.visual.eventHandler as SketchEventHandler;
+
+            const run = new DistanceDimensionCommand().execute(app);
+            handler.pointerDown(view, pointerEvent(450, 300));
+            await tick();
+            handler.pointerDown(view, pointerEvent(460, 300));
+            await tick();
+            expect(editor.solver.toData().constraints.length).toBe(0);
+            handler.pointerDown(view, pointerEvent(450, 250));
+            await run;
+
+            expect(dialogInput(dialog).value).toBe("100.00");
+            expect(editor.solver.toData().constraints[0].kind).toBe(ConstraintKind.P2PDistance);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
     test("editDatum re-opens the dialog with the current value and updates it", () => {
         const { doc, dialog, restorePub, restoreFactory } = setup();
         try {

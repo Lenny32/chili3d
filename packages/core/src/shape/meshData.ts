@@ -39,6 +39,16 @@ export interface MeshOptions {
     color?: number | number[];
     uv?: Float32Array;
     groups?: MeshGroup[];
+    semanticFaceGroups?: MeshFaceGroup[];
+}
+
+/** Stable semantic triangle ranges, separate from render/material draw groups. */
+export interface MeshFaceGroup {
+    id: string;
+    name: string;
+    startTriangle: number;
+    triangleCount: number;
+    color?: number;
 }
 
 @serializable()
@@ -51,6 +61,7 @@ export class Mesh {
         this.color = options?.color ?? 0xfff;
         this.uv = options?.uv;
         this.groups = options?.groups ?? [];
+        if (options?.semanticFaceGroups?.length) this.setSemanticFaceGroups(options.semanticFaceGroups);
     }
     static createSurface(positionSize: number, indexSize: number) {
         const mesh = new Mesh();
@@ -89,6 +100,58 @@ export class Mesh {
 
     @serialize()
     groups: MeshGroup[] = [];
+
+    @serialize()
+    semanticFaceGroupsJson = "[]";
+
+    @serialize()
+    semanticTopologyHash = "";
+
+    get semanticFaceGroups(): MeshFaceGroup[] {
+        return JSON.parse(this.semanticFaceGroupsJson) as MeshFaceGroup[];
+    }
+
+    semanticGroupsAreCurrent(): boolean {
+        return this.semanticTopologyHash === this.topologyHash();
+    }
+
+    private topologyHash(): string {
+        let hash = 2166136261;
+        for (const array of [this.position, this.index]) {
+            if (!array) continue;
+            for (const value of array) {
+                const bits = Math.round(value * 1e6);
+                hash = Math.imul(hash ^ bits, 16777619);
+            }
+        }
+        return (hash >>> 0).toString(16);
+    }
+
+    setSemanticFaceGroups(groups: MeshFaceGroup[]): void {
+        const triangleCount = this.index ? this.index.length / 3 : (this.position?.length ?? 0) / 9;
+        const seen = new Set<string>();
+        const ranges: Array<[number, number]> = [];
+        for (const group of groups) {
+            if (!group.id || seen.has(group.id)) throw new Error("Mesh face group IDs must be unique");
+            seen.add(group.id);
+            if (
+                !Number.isInteger(group.startTriangle) ||
+                !Number.isInteger(group.triangleCount) ||
+                group.startTriangle < 0 ||
+                group.triangleCount <= 0 ||
+                group.startTriangle + group.triangleCount > triangleCount
+            ) {
+                throw new Error(`Mesh face group ${group.name} has an invalid triangle range`);
+            }
+            const range: [number, number] = [group.startTriangle, group.startTriangle + group.triangleCount];
+            if (ranges.some(([start, end]) => range[0] < end && start < range[1])) {
+                throw new Error("Mesh face groups must not overlap");
+            }
+            ranges.push(range);
+        }
+        this.semanticFaceGroupsJson = JSON.stringify(groups);
+        this.semanticTopologyHash = this.topologyHash();
+    }
 }
 
 export interface IShapeMeshData {

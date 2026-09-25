@@ -1,0 +1,26 @@
+# Inspect ticket coverage and verification
+
+This table maps `tickets/inspect-00` through `inspect-17` to the implemented analysis kind and its focused evidence. Results are document-owned, recomputed after source edits, and never become model topology. Numerical checks use millimetres unless a row says otherwise. “Unknown” or “incomplete” never means pass.
+
+| Ticket | Delivered behavior | Verification and limit |
+|---|---|---|
+| 00 Foundation | Serializable analysis nodes, stable source references, cancellation, undo, legends, overlays, and deterministic newest-first display arbitration. | `packages/core/test/analysis.test.ts`; multiple face-color modes on overlapping sources are mutually exclusive as whole analyses, so a multi-source map is suppressed in full if any source conflicts. |
+| 01 Measure | Point/edge/face/solid measures, including guarded exact volume and world-space witness distance. | `packages/wasm/test/inspectBasic.test.ts`, `packages/app/test/inspectSection.test.ts`; malformed/open geometry fails rather than returning a guessed measure. |
+| 02 Section | Adjustable/flip plane, clipping across views and picking, exact Boolean cap with cavity holes. | `packages/wasm/test/inspectGeometry.test.ts`, `packages/three/test/inspectClip.test.ts`, browser hollow-cylinder cap fixture; cap mesh uses a display-only 0.0001 mm bias into retained halfspace to avoid clip precision artifacts. |
+| 03 Interference | Pairwise positive-volume intersection with overlap rows and temporary common-shape highlights. | `packages/wasm/test/inspectBasic.test.ts`; exact Boolean query is synchronous in WASM. |
+| 04 Center of mass | Guarded mass-weighted center, marker, and PointStep snapping from a ready visible analysis. | `packages/wasm/test/inspectBasic.test.ts`, `packages/core/test/inspectMarkerSnap.test.ts`; center marker is analysis data, never a model vertex. |
+| 05 Curvature comb | Edge curvature and undefined singular samples, comb geometry, bounded continuity diagnostics. | `packages/wasm/test/inspectGeometry.test.ts`, `inspectAdvanced.test.ts`; sketch-edge inspector is outside the body-edge workflow. |
+| 06 Curvature map | Gaussian/minimum/maximum curvature over sampled trimmed face triangles. | `packages/wasm/test/inspectGeometry.test.ts`, `inspectAdvanced.test.ts`; unsampled micro-features can be missed. |
+| 07 Draft | Signed normal-to-pull angle heat map and threshold band; raw vector or stable edge/planar-face direction reference. | `packages/wasm/test/inspectAdvanced.test.ts`; local normals do not establish global tool access. |
+| 08 Environment map | Procedural studio/softbox reflection with rotation and finish controls, restored materials. | `packages/three/test/inspectAppearance.test.ts`, Chromium shader fixture; camera-space pattern and source tessellation limit display fidelity. |
+| 09 Isocurves | Exact trimmed U/V curves, including holes, finite face bounds, optional curvature comb. | `packages/wasm/test/inspectAdvanced.test.ts`; unsupported/singular faces report unavailable results. |
+| 10 Zebra | Procedural camera-space continuity stripes with direction, density, contrast and material leases. | `packages/three/test/inspectAppearance.test.ts`, Chromium shader/clip fixture; stripes are visual evidence, not a C2 continuity certificate. |
+| 11 Accessibility | Directional point access on sampled faces, using guarded nearest forward obstruction rays and explicit target/blocker roles. | `packages/wasm/test/inspectAdvanced.test.ts`; no finite cutter/tool envelope or collision sweep. |
+| 12 Minimum radius | Concave principal radius threshold over sampled faces, singular areas shown unknown. | `packages/wasm/test/inspectGeometry.test.ts`; local sampled curvature is not a global minimum proof. |
+| 13 Design advice | Single-solid sampled wall, draft, and concave radius findings with temporary markers. | `packages/wasm/test/inspectDesignAdvice.test.ts`; no process/material simulation, uncertain samples count unknown. |
+| 14 Fastener stack | User-entered bolt/washer/nut/part semantics, diameter, alignment, reach and engagement checks. | `packages/app/test/inspectFastener.test.ts`; metadata is manual and missing fields count incomplete. |
+| 15 Component colors | Stable group-owner palette on geometry and matching tree indicators with a global toggle. | `packages/three/test/inspectAppearance.test.ts`, UI tree tests; group ownership follows the nearest group ancestor. |
+| 16 Mesh face groups | Persisted semantic triangle groups separate from `Mesh.groups` draw ranges; topology invalidation and temporary group colors. | `packages/app/test/inspectMeshGroups.test.ts`; STL lacks standard group metadata, so ungrouped STL remains ungrouped. |
+| 17 Similar components | Explicit library in open documents, bounded descriptor ranking, previews, open/insert actions. | `packages/wasm/test/inspectSimilarity.test.ts`; descriptors are mesh covariance, radial bins, solid volume/area, not physical inertia or a cloud search. |
+
+The native inspection queries are compiled into `packages/wasm/lib/chili-wasm.{js,wasm,d.ts}` and exercised by real-WASM tests. `docs/inspect-advanced-design.md` records the advanced rule contracts; `docs/inspect-lifecycle.md` records ownership, display conflicts, units, and sampling boundaries.

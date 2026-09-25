@@ -23,6 +23,9 @@ rs.mock("@chili3d/core", () => {
     } = rs.hoisted(() => require("./coreMocks"));
     return {
         ...actual,
+        AnalysisNode: class AnalysisNode {},
+        ShapeNode: class ShapeNode {},
+        MeshNode: class MeshNode {},
         Binding: BindingMock,
         Transaction: TransactionMock,
         FolderNode: FolderNodeMock,

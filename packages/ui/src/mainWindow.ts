@@ -18,6 +18,7 @@ import { Editor } from "./editor";
 import { showFloatPanel } from "./floatPanel";
 import { Home } from "./home";
 import { Permanent } from "./permanent";
+import { showAnalysisPanel } from "./project/analysisPanel";
 import { Toast } from "./toast";
 
 const quickCommands: CommandKeys[] = ["doc.save", "doc.saveToFile", "file.export", "edit.undo", "edit.redo"];
@@ -88,6 +89,7 @@ export class MainWindow extends HTMLElement implements IWindow {
         PubSub.default.sub("showToast", Toast.info);
         PubSub.default.sub("displayError", Toast.error);
         PubSub.default.sub("showDialog", showDialog);
+        PubSub.default.sub("showAnalysisPanel", showAnalysisPanel);
         PubSub.default.sub("showFloatPanel", showFloatPanel);
         PubSub.default.sub("showPermanent", Permanent.show);
         PubSub.default.sub("activeViewChanged", (view) => displayHome(app, view === undefined));

@@ -94,7 +94,7 @@ describe("TreeModel (TreeItem)", () => {
             const item = createItem();
             expect(item.classList.contains("tm-panel")).toBe(true);
             expect(item.children[0]).toBe(item.name);
-            expect(item.children[1]).toBe(item.visibleIcon);
+            expect(item.children[2]).toBe(item.visibleIcon);
         });
 
         test("should lead with the type icon a node declares", () => {
@@ -239,7 +239,7 @@ describe("TreeModel (TreeItem)", () => {
             expect(item.warningBadge.textContent).toBe("!");
             expect(item.warningBadge.classList.contains("ti-warning")).toBe(true);
             expect(item.warningBadge.classList.contains("ti-hidden")).toBe(true);
-            expect(item.children[2]).toBe(item.warningBadge);
+            expect(item.children[3]).toBe(item.warningBadge);
         });
 
         test("should show the badge with a count tooltip when the node reports warnings", () => {

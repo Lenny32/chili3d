@@ -124,6 +124,8 @@ export function createMockVisualContext(
 ): IVisualContext {
     return {
         shapeCount: 0,
+        acquireAnalysisClip: () => () => {},
+        acquireAnalysisAppearance: () => () => {},
         addVisualObject: () => {},
         boundingBoxIntersectFilter: () => [],
         removeVisualObject: () => {},

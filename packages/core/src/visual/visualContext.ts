@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import type { IDisposable } from "../foundation";
-import type { BoundingBox, Matrix4 } from "../math";
+import type { BoundingBox, Matrix4, Plane } from "../math";
 import type { INode } from "../model";
 import type { IShapeFilter } from "../selectionFilter";
 import type { EdgeMeshData, MeshLike, ShapeMeshData } from "../shape";
@@ -13,6 +13,18 @@ export type MeshOption = {
     lineOpacity?: number;
     vertexOpacity?: number;
     onTop?: boolean;
+};
+
+export type AnalysisAppearance = {
+    nodeId: string;
+    mode: "chrome" | "zebra" | "color";
+    color?: number;
+    rotation?: number;
+    mirrorFinish?: number;
+    density?: number;
+    contrast?: number;
+    direction?: number;
+    environment?: "studio" | "softbox";
 };
 
 export interface IVisualContext extends IDisposable {
@@ -36,4 +48,9 @@ export interface IVisualContext extends IDisposable {
     displayLineSegments(data: EdgeMeshData): number;
     setPosition(id: number, position: Float32Array): void;
     setInstanceMatrix(id: number, matrixs: Matrix4[]): void;
+    /** Owns a document-wide viewport clipping plane until the returned lease is released. */
+    acquireAnalysisClip(ownerId: string, plane: Plane): () => void;
+    acquireAnalysisAppearance(ownerId: string, appearances: AnalysisAppearance[]): () => void;
+    /** Whether a world-space point lies in the currently retained section half-space. */
+    isAnalysisPointVisible?(point: { x: number; y: number; z: number }): boolean;
 }

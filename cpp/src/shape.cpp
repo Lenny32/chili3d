@@ -5,6 +5,8 @@
 #include <emscripten/val.h>
 
 #include <BRepAdaptor_Curve.hxx>
+#include <BRepAdaptor_Surface.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 #include <BRepAlgoAPI_Section.hxx>
 #include <BRepAlgoAPI_Splitter.hxx>
 #include <BRepBndLib.hxx>
@@ -16,6 +18,7 @@
 #include <BRepGProp.hxx>
 #include <BRepGProp_Face.hxx>
 #include <BRepOffsetAPI_MakeOffset.hxx>
+#include <BRepPrimAPI_MakeHalfSpace.hxx>
 #include <BRepPrim_Builder.hxx>
 #include <BRepTools.hxx>
 #include <BRepTools_WireExplorer.hxx>
@@ -62,7 +65,48 @@
 
 using namespace emscripten;
 
+struct InspectionDistance {
+    double distance;
+    Vector3 first;
+    Vector3 second;
+};
+
+struct InspectionMass {
+    double volume;
+    Vector3 center;
+};
+
+struct InspectionUVBounds {
+    double u1;
+    double u2;
+    double v1;
+    double v2;
+};
+
+struct InspectionRayResult {
+    bool valid;
+    bool hasHit;
+    Vector3 point;
+};
+
 class Shape {
+    static bool containsOnlySolids(const TopoDS_Shape& shape)
+    {
+        if (shape.IsNull())
+            return false;
+        if (shape.ShapeType() == TopAbs_SOLID)
+            return true;
+        if (shape.ShapeType() != TopAbs_COMPOUND && shape.ShapeType() != TopAbs_COMPSOLID)
+            return false;
+        bool hasChild = false;
+        for (TopoDS_Iterator child(shape); child.More(); child.Next()) {
+            hasChild = true;
+            if (!containsOnlySolids(child.Value()))
+                return false;
+        }
+        return hasChild;
+    }
+
 public:
     static size_t ptr(const TopoDS_Shape& shape)
     {
@@ -189,6 +233,102 @@ public:
             return -1.0;
         }
         return extrema.Value();
+    }
+
+    static std::optional<InspectionDistance> inspectionDistance(const TopoDS_Shape& shape, const TopoDS_Shape& other)
+    {
+        if (shape.IsNull() || other.IsNull())
+            return std::nullopt;
+        BRepExtrema_DistShapeShape extrema(shape, other);
+        if (!extrema.IsDone() || extrema.NbSolution() < 1)
+            return std::nullopt;
+        return InspectionDistance { extrema.Value(), Vector3::fromPnt(extrema.PointOnShape1(1)),
+            Vector3::fromPnt(extrema.PointOnShape2(1)) };
+    }
+
+    static std::optional<double> inspectionCommonVolume(const TopoDS_Shape& first, const TopoDS_Shape& second)
+    {
+        if (!containsOnlySolids(first) || !containsOnlySolids(second)
+            || !BRepCheck_Analyzer(first).IsValid()
+            || !BRepCheck_Analyzer(second).IsValid())
+            return std::nullopt;
+        BRepAlgoAPI_Common common(first, second);
+        common.Build();
+        if (!common.IsDone() || common.Shape().IsNull())
+            return std::nullopt;
+        GProp_GProps props;
+        BRepGProp::VolumeProperties(common.Shape(), props);
+        double volume = std::abs(props.Mass());
+        return std::isfinite(volume) ? std::optional<double>(volume) : std::nullopt;
+    }
+
+    static std::optional<InspectionMass> inspectionMass(const TopoDS_Shape& shape)
+    {
+        if (!containsOnlySolids(shape) || !BRepCheck_Analyzer(shape).IsValid())
+            return std::nullopt;
+        GProp_GProps props;
+        BRepGProp::VolumeProperties(shape, props);
+        if (!std::isfinite(props.Mass()) || std::abs(props.Mass()) < 1e-12)
+            return std::nullopt;
+        const gp_Pnt center = props.CentreOfMass();
+        if (!std::isfinite(center.X()) || !std::isfinite(center.Y()) || !std::isfinite(center.Z()))
+            return std::nullopt;
+        return InspectionMass { std::abs(props.Mass()), Vector3::fromPnt(center) };
+    }
+
+    static TopoDS_Shape inspectionSectionCaps(const TopoDS_Shape& shape, const Pln& plane)
+    {
+        const Vector3& o = plane.location;
+        const Vector3& n = plane.direction;
+        const Vector3& x = plane.xDirection;
+        const double normalLengthSq = n.x * n.x + n.y * n.y + n.z * n.z;
+        const double xLengthSq = x.x * x.x + x.y * x.y + x.z * x.z;
+        if (!containsOnlySolids(shape) || !BRepCheck_Analyzer(shape).IsValid()
+            || !std::isfinite(o.x) || !std::isfinite(o.y) || !std::isfinite(o.z)
+            || !std::isfinite(n.x) || !std::isfinite(n.y) || !std::isfinite(n.z)
+            || !std::isfinite(x.x) || !std::isfinite(x.y) || !std::isfinite(x.z)
+            || !std::isfinite(normalLengthSq) || normalLengthSq < 1e-24
+            || !std::isfinite(xLengthSq) || xLengthSq < 1e-24)
+            return TopoDS_Shape();
+        gp_Dir normal = Vector3::toDir(n);
+        gp_Dir xDirection = Vector3::toDir(x);
+        if (std::abs(normal.Dot(xDirection)) > 1.0 - 1e-8)
+            return TopoDS_Shape();
+        Bnd_Box box;
+        BRepBndLib::Add(shape, box, false);
+        if (box.IsVoid())
+            return TopoDS_Shape();
+        const gp_Pnt low = box.CornerMin();
+        const gp_Pnt high = box.CornerMax();
+        double radius = std::max(low.Distance(Vector3::toPnt(o)), high.Distance(Vector3::toPnt(o))) * 3.0 + 1.0;
+        if (!std::isfinite(radius) || radius > 1e12)
+            return TopoDS_Shape();
+        gp_Pln cut = Pln::toPln(plane);
+        BRepBuilderAPI_MakeFace faceBuilder(cut, -radius, radius, -radius, radius);
+        if (!faceBuilder.IsDone())
+            return TopoDS_Shape();
+        BRepPrimAPI_MakeHalfSpace halfSpace(faceBuilder.Face(),
+            Vector3::toPnt(o).Translated(gp_Vec(normal).Multiplied(radius)));
+        if (!halfSpace.IsDone() || halfSpace.Solid().IsNull())
+            return TopoDS_Shape();
+        BRepAlgoAPI_Common common(shape, halfSpace.Solid());
+        common.Build();
+        if (!common.IsDone() || common.Shape().IsNull())
+            return TopoDS_Shape();
+        BRep_Builder builder;
+        TopoDS_Compound caps;
+        builder.MakeCompound(caps);
+        for (TopExp_Explorer it(common.Shape(), TopAbs_FACE); it.More(); it.Next()) {
+            const TopoDS_Face face = TopoDS::Face(it.Current());
+            BRepAdaptor_Surface surface(face, true);
+            if (surface.GetType() != GeomAbs_Plane || std::abs(surface.Plane().Axis().Direction().Dot(normal)) < 1.0 - 1e-7)
+                continue;
+            GProp_GProps props;
+            BRepGProp::SurfaceProperties(face, props);
+            if (std::abs(cut.Distance(props.CentreOfMass())) <= 1e-6)
+                builder.Add(caps, face);
+        }
+        return caps;
     }
 
     static size_t countShape(const TopoDS_Shape& shape, TopAbs_ShapeEnum shapeType)
@@ -568,6 +708,69 @@ public:
 
 class Face {
 public:
+    static TopoDS_Shape inspectionTrimmedIso(const TopoDS_Face& face, bool isU, double parameter)
+    {
+        if (face.IsNull() || !std::isfinite(parameter) || BRep_Tool::Surface(face).IsNull()
+            || BRepTools::OuterWire(face).IsNull())
+            return TopoDS_Shape();
+        double u1, u2, v1, v2;
+        BRepTools::UVBounds(face, u1, u2, v1, v2);
+        if (!std::isfinite(u1) || !std::isfinite(u2) || !std::isfinite(v1) || !std::isfinite(v2)
+            || u1 >= u2 || v1 >= v2 || parameter < (isU ? u1 : v1) || parameter > (isU ? u2 : v2)) {
+            return TopoDS_Shape();
+        }
+        Handle(Geom_Surface) surface = BRep_Tool::Surface(face);
+        Handle(Geom_Curve) iso = isU ? surface->UIso(parameter) : surface->VIso(parameter);
+        if (iso.IsNull())
+            return TopoDS_Shape();
+        BRepBuilderAPI_MakeEdge edgeBuilder(iso, isU ? v1 : u1, isU ? v2 : u2);
+        if (!edgeBuilder.IsDone())
+            return TopoDS_Shape();
+        BRepAlgoAPI_Common common(face, edgeBuilder.Edge());
+        common.Build();
+        return common.IsDone() ? common.Shape() : TopoDS_Shape();
+    }
+
+    static std::optional<InspectionUVBounds> inspectionUVBounds(const TopoDS_Face& face)
+    {
+        if (face.IsNull() || BRep_Tool::Surface(face).IsNull() || BRepTools::OuterWire(face).IsNull()) {
+            return std::nullopt;
+        }
+        double u1, u2, v1, v2;
+        BRepTools::UVBounds(face, u1, u2, v1, v2);
+        if (!std::isfinite(u1) || !std::isfinite(u2) || !std::isfinite(v1) || !std::isfinite(v2)
+            || u1 >= u2 || v1 >= v2)
+            return std::nullopt;
+        return InspectionUVBounds { u1, u2, v1, v2 };
+    }
+
+    static InspectionRayResult inspectionRayHit(const TopoDS_Face& face, const Vector3& point,
+        const Vector3& direction, double minDistance, double maxDistance, double tolerance)
+    {
+        if (face.IsNull() || BRep_Tool::Surface(face).IsNull() || !std::isfinite(direction.x) || !std::isfinite(direction.y) || !std::isfinite(direction.z) || !std::isfinite(point.x) || !std::isfinite(point.y) || !std::isfinite(point.z) || direction.x * direction.x + direction.y * direction.y + direction.z * direction.z < 1e-24 || !std::isfinite(minDistance) || !std::isfinite(maxDistance) || minDistance < 0 || minDistance >= maxDistance || !std::isfinite(tolerance) || tolerance <= 0) {
+            return InspectionRayResult { false, false, Vector3 { 0.0, 0.0, 0.0 } };
+        }
+        gp_Lin line(Vector3::toPnt(point), Vector3::toDir(direction));
+        IntCurvesFace_Intersector intersector(face, tolerance);
+        intersector.Perform(line, minDistance, maxDistance);
+        if (!intersector.IsDone())
+            return InspectionRayResult { false, false, Vector3 { 0.0, 0.0, 0.0 } };
+        if (intersector.NbPnt() < 1)
+            return InspectionRayResult { true, false, Vector3 { 0.0, 0.0, 0.0 } };
+        double nearest = maxDistance;
+        std::optional<Vector3> result;
+        for (int i = 1; i <= intersector.NbPnt(); ++i) {
+            double parameter = intersector.WParameter(i);
+            if (parameter >= minDistance && parameter < nearest) {
+                nearest = parameter;
+                result = Vector3::fromPnt(intersector.Pnt(i));
+            }
+        }
+        return result.has_value()
+            ? InspectionRayResult { true, true, result.value() }
+            : InspectionRayResult { true, false, Vector3 { 0.0, 0.0, 0.0 } };
+    }
+
     static double area(const TopoDS_Face& face)
     {
         GProp_GProps props;
@@ -683,11 +886,34 @@ public:
 
 EMSCRIPTEN_BINDINGS(Shape)
 {
+    register_optional<InspectionDistance>();
+    register_optional<InspectionMass>();
+    value_object<InspectionDistance>("InspectionDistance")
+        .field("distance", &InspectionDistance::distance)
+        .field("first", &InspectionDistance::first)
+        .field("second", &InspectionDistance::second);
+    value_object<InspectionMass>("InspectionMass")
+        .field("volume", &InspectionMass::volume)
+        .field("center", &InspectionMass::center);
+    register_optional<InspectionUVBounds>();
+    value_object<InspectionUVBounds>("InspectionUVBounds")
+        .field("u1", &InspectionUVBounds::u1)
+        .field("u2", &InspectionUVBounds::u2)
+        .field("v1", &InspectionUVBounds::v1)
+        .field("v2", &InspectionUVBounds::v2);
+    value_object<InspectionRayResult>("InspectionRayResult")
+        .field("valid", &InspectionRayResult::valid)
+        .field("hasHit", &InspectionRayResult::hasHit)
+        .field("point", &InspectionRayResult::point);
     class_<Shape>("Shape")
         .class_function("ptr", &Shape::ptr)
         .class_function("boundingBox", &Shape::boundingBox)
         .class_function("orientedBoundingBox", &Shape::orientedBoundingBox)
         .class_function("extremaDistance", &Shape::extremaDistance)
+        .class_function("inspectionDistance", &Shape::inspectionDistance)
+        .class_function("inspectionCommonVolume", &Shape::inspectionCommonVolume)
+        .class_function("inspectionMass", &Shape::inspectionMass)
+        .class_function("inspectionSectionCaps", &Shape::inspectionSectionCaps)
         .class_function("clean", &Shape::clean)
         .class_function("clone", &Shape::clone)
         .class_function("transformed", &Shape::transformed)
@@ -727,6 +953,9 @@ EMSCRIPTEN_BINDINGS(Shape)
         .class_function("edgeLoop", &Wire::edgeLoop);
 
     class_<Face>("Face")
+        .class_function("inspectionTrimmedIso", &Face::inspectionTrimmedIso)
+        .class_function("inspectionUVBounds", &Face::inspectionUVBounds)
+        .class_function("inspectionRayHit", &Face::inspectionRayHit)
         .class_function("area", &Face::area)
         .class_function("offset", &Face::offset)
         .class_function("outerWire", &Face::outerWire)

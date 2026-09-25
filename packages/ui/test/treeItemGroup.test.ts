@@ -88,7 +88,7 @@ describe("TreeGroup", () => {
             expect(group.header.className).toBe("tig-row tig-header");
             expect(group.header.children[0]).toBe(group.expanderIcon);
             expect(group.header.children[1]).toBe(group.name);
-            expect(group.header.children[2]).toBe(group.visibleIcon);
+            expect(group.header.children[3]).toBe(group.visibleIcon);
         });
 
         test("should place the group's type icon between the expander and the name", () => {
@@ -105,7 +105,7 @@ describe("TreeGroup", () => {
         test("should badge the header when the group node reports warnings", () => {
             const node = new MockGroupNode();
             const { group } = createGroup(node);
-            expect(group.header.children[3]).toBe(group.warningBadge);
+            expect(group.header.children[4]).toBe(group.warningBadge);
             expect(group.warningBadge.classList.contains("ti-hidden")).toBe(true);
 
             (node as any).warningCount = 1;

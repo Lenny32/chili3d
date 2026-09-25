@@ -40,6 +40,7 @@ import {
     type SerializedData,
     type ShapeMeshRange,
     type ShapeType,
+    ShapeTypes,
     serializable,
     type VertexMeshData,
     VisualConfig,
@@ -233,6 +234,61 @@ export class OccShape implements IShape {
         throw new Error("Invalid shape type");
     }
 
+    inspectionDistance(other: IShape): Result<{ distance: number; first: XYZ; second: XYZ }> {
+        if (!(other instanceof OccShape) || this.isNull() || other.isNull()) {
+            return Result.err("Inspection requires two non-null OCCT shapes");
+        }
+        const value = wasm.Shape.inspectionDistance(this.shape, other.shape);
+        if (
+            !value ||
+            !Number.isFinite(value.distance) ||
+            value.distance < 0 ||
+            ![
+                value.first.x,
+                value.first.y,
+                value.first.z,
+                value.second.x,
+                value.second.y,
+                value.second.z,
+            ].every(Number.isFinite)
+        ) {
+            return Result.err("Closest points are unavailable");
+        }
+        return Result.ok({
+            distance: value.distance,
+            first: toXYZ(value.first),
+            second: toXYZ(value.second),
+        });
+    }
+
+    inspectionCommonVolume(other: IShape): Result<number> {
+        if (!(other instanceof OccShape) || this.isNull() || other.isNull()) {
+            return Result.err("Intersection requires two non-null OCCT shapes");
+        }
+        const value = wasm.Shape.inspectionCommonVolume(this.shape, other.shape);
+        return value == null || !Number.isFinite(value) || value < 0
+            ? Result.err("Intersection volume is unavailable")
+            : Result.ok(value);
+    }
+
+    inspectionMass(): Result<{ volume: number; center: XYZ }> {
+        if (
+            this.isNull() ||
+            (this.shapeType !== ShapeTypes.solid &&
+                this.shapeType !== ShapeTypes.compound &&
+                this.shapeType !== ShapeTypes.compoundSolid)
+        ) {
+            return Result.err("Volume center requires a non-null solid or solid compound");
+        }
+        const value = wasm.Shape.inspectionMass(this.shape);
+        return value &&
+            Number.isFinite(value.volume) &&
+            value.volume > 0 &&
+            [value.center.x, value.center.y, value.center.z].every(Number.isFinite)
+            ? Result.ok({ volume: value.volume, center: toXYZ(value.center) })
+            : Result.err("Volume center is unavailable");
+    }
+
     clone(): IShape {
         return OccShape.wrap(wasm.Shape.clone(this._shape));
     }
@@ -293,6 +349,26 @@ export class OccShape implements IShape {
 
     volume(): number {
         return wasm.Shape.volume(this.shape);
+    }
+
+    inspectionSectionCaps(plane: Plane): Result<IShape> {
+        if (
+            this.isNull() ||
+            (this.shapeType !== ShapeTypes.solid &&
+                this.shapeType !== ShapeTypes.compound &&
+                this.shapeType !== ShapeTypes.compoundSolid) ||
+            ![...plane.origin.toArray(), ...plane.normal.toArray(), ...plane.xvec.toArray()].every(
+                Number.isFinite,
+            )
+        ) {
+            return Result.err("Section caps require a valid solid and finite plane");
+        }
+        const caps = wasm.Shape.inspectionSectionCaps(this.shape, {
+            location: plane.origin,
+            direction: plane.normal,
+            xDirection: plane.xvec,
+        });
+        return caps.isNull() ? Result.err("Section caps are unavailable") : Result.ok(OccShape.wrap(caps));
     }
 
     section(shape: IShape | Plane): IShape {
@@ -610,6 +686,37 @@ export class OccFace extends OccShape implements IFace {
     constructor(options: OccFaceOptions) {
         super(options);
         this.face = options.shape;
+    }
+
+    inspectionTrimmedIso(direction: "u" | "v", parameter: number): IShape | undefined {
+        if (!Number.isFinite(parameter)) return undefined;
+        const shape = wasm.Face.inspectionTrimmedIso(this.face, direction === "u", parameter);
+        return shape.isNull() ? undefined : OccShape.wrap(shape);
+    }
+
+    inspectionUVBounds(): Result<{ u1: number; u2: number; v1: number; v2: number }> {
+        const bounds = wasm.Face.inspectionUVBounds(this.face);
+        return bounds ? Result.ok(bounds) : Result.err("Face has no finite trimmed UV domain");
+    }
+
+    inspectionRayHit(
+        point: XYZLike,
+        direction: XYZLike,
+        minDistance: number,
+        maxDistance: number,
+        tolerance = 1e-6,
+    ): Result<XYZ | undefined> {
+        const hit = wasm.Face.inspectionRayHit(
+            this.face,
+            point,
+            direction,
+            minDistance,
+            maxDistance,
+            tolerance,
+        );
+        return hit.valid
+            ? Result.ok(hit.hasHit ? toXYZ(hit.point) : undefined)
+            : Result.err("Forward ray could not be evaluated on this face");
     }
 
     area(): number {

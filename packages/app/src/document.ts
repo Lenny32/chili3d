@@ -3,6 +3,7 @@
 
 import {
     type Act,
+    AnalysisManager,
     Constants,
     History,
     I18n,
@@ -23,10 +24,14 @@ import {
     Serializer,
     VariableTable,
 } from "@chili3d/core";
+import { registerAdvancedInspectAnalyses } from "./analysis/advanced";
+import { registerBasicInspectAnalyses } from "./analysis/basic";
+import { registerPrerequisiteInspectAnalyses } from "./analysis/prerequisites";
 import { Picker } from "./picker";
 import { SelectionManager } from "./selectionManager";
 
 export class Document extends Observable implements IDocument {
+    readonly analyses: AnalysisManager;
     readonly visual: IVisual;
     readonly history: History;
     readonly selection: ISelection;
@@ -61,8 +66,13 @@ export class Document extends Observable implements IDocument {
         this.selection = new SelectionManager(this);
         this.picker = new Picker(this);
         this.visual = application.visualFactory.create(this);
+        this.analyses = new AnalysisManager(this);
+        registerBasicInspectAnalyses(this.analyses);
+        registerAdvancedInspectAnalyses(this.analyses);
+        registerPrerequisiteInspectAnalyses(this.analyses);
 
         application.documents.add(this);
+        PubSub.default.pub("documentOpened", this);
     }
 
     serialize(): Serialized {
@@ -82,6 +92,7 @@ export class Document extends Observable implements IDocument {
     override disposeInternal(): void {
         super.disposeInternal();
 
+        this.analyses.dispose();
         this.modelManager.dispose();
         this.visual.dispose();
         this.history.dispose();
@@ -154,6 +165,7 @@ export class Document extends Observable implements IDocument {
         }
 
         await document.modelManager.deserialize(data["models"]);
+        document.analyses.attachModel();
         document.history.disabled = false;
         return document;
     }

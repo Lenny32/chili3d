@@ -20,6 +20,7 @@ function createVisualWithObserverTracking(): {
     const collectionHandlers: Array<(args: unknown) => void> = [];
 
     const document = {
+        application: { views: [] },
         modelManager: {
             addNodeObserver: (fn: (records: unknown[]) => void) => {
                 nodeObservers.push(fn);

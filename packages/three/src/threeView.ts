@@ -161,6 +161,7 @@ export class ThreeView extends Observable implements IView {
         this._gizmo = this.initGizmo();
         this.camera.layers.enableAll();
         this.document.application.views.push(this);
+        this.content.applyAnalysisClipToView(this);
         this.animate();
     }
 
@@ -479,6 +480,19 @@ export class ThreeView extends Observable implements IView {
         for (const obj of selectionBox.select()) {
             const threeObject = obj.parent as ThreeVisualObject;
             if (!threeObject?.visible) continue;
+            const box = typeof threeObject.boundingBox === "function" ? threeObject.boundingBox() : undefined;
+            if (
+                box &&
+                !this.isBoundingBoxInRect(
+                    box,
+                    threeObject.worldTransform(),
+                    Math.min(mx1, mx2),
+                    Math.min(my1, my2),
+                    Math.max(mx1, mx2),
+                    Math.max(my1, my2),
+                )
+            )
+                continue;
 
             const node = this.getNodeFromObject(threeObject);
             if (node === undefined) continue;
@@ -729,20 +743,25 @@ export class ThreeView extends Observable implements IView {
         let screenMinY = Number.POSITIVE_INFINITY;
         let screenMaxX = Number.NEGATIVE_INFINITY;
         let screenMaxY = Number.NEGATIVE_INFINITY;
+        let anyVisible = false;
 
         const { min, max } = box;
         for (let i = 0; i < 8; i++) {
             const ix = i & 1 ? max.x : min.x;
             const iy = i & 2 ? max.y : min.y;
             const iz = i & 4 ? max.z : min.z;
-            const { x, y } = this.worldToScreen(worldMatrix.ofPoint({ x: ix, y: iy, z: iz }));
+            const worldPoint = worldMatrix.ofPoint({ x: ix, y: iy, z: iz });
+            if (this.content.isAnalysisPointVisible(worldPoint)) anyVisible = true;
+            const { x, y } = this.worldToScreen(worldPoint);
             if (x < screenMinX) screenMinX = x;
             if (y < screenMinY) screenMinY = y;
             if (x > screenMaxX) screenMaxX = x;
             if (y > screenMaxY) screenMaxY = y;
         }
 
-        return screenMinX <= maxX && screenMaxX >= minX && screenMinY <= maxY && screenMaxY >= minY;
+        return (
+            anyVisible && screenMinX <= maxX && screenMaxX >= minX && screenMinY <= maxY && screenMaxY >= minY
+        );
     }
 
     private isShapeInRect(
@@ -759,6 +778,7 @@ export class ThreeView extends Observable implements IView {
 
         const composed = localTransform ? worldMatrix.multiply(localTransform) : worldMatrix;
         const center = BoundingBox.center(box);
+        if (!this.content.isAnalysisPointVisible(composed.ofPoint(center))) return false;
         const { x, y } = this.worldToScreen(composed.ofPoint(center));
 
         return x <= maxX && x >= minX && y <= maxY && y >= minY;
@@ -945,13 +965,17 @@ export class ThreeView extends Observable implements IView {
             }
         });
         visuals = visuals.filter((x) => x !== undefined && x !== null);
-        return this.initRaycaster(mx, my).intersectObjects(visuals, false);
+        return this.initRaycaster(mx, my)
+            .intersectObjects(visuals, false)
+            .filter((hit) => this.content.isAnalysisPointVisible(hit.point));
     }
 
     private findIntersectedShapes(shapeType: ShapeType, mx: number, my: number) {
         const raycaster = this.initRaycaster(mx, my);
         const shapes = this.initIntersectableShapes(shapeType);
-        return raycaster.intersectObjects(shapes, false);
+        return raycaster
+            .intersectObjects(shapes, false)
+            .filter((hit) => this.content.isAnalysisPointVisible(hit.point));
     }
 
     private initIntersectableShapes(shapeType: ShapeType) {

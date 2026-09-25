@@ -3,6 +3,7 @@
 
 import {
     type Act,
+    AnalysisManager,
     History,
     type IApplication,
     type IDocument,
@@ -25,6 +26,7 @@ export class TestDocument implements IDocument {
     name: string;
     id: string;
     history: History;
+    analyses: AnalysisManager;
     selection: ISelection;
     picker: IPicker;
     visual: IVisual;
@@ -47,6 +49,7 @@ export class TestDocument implements IDocument {
     }
 
     dispose() {
+        this.analyses.dispose();
         this.modelManager.dispose();
     }
 
@@ -79,5 +82,6 @@ export class TestDocument implements IDocument {
         this.application = overrides?.application ?? ({ views: [] } as unknown as IApplication);
         this.modelManager = new ModelManager(this);
         this.variables = new VariableTable(this);
+        this.analyses = new AnalysisManager(this);
     }
 }

@@ -16,6 +16,7 @@ import {
     type IVariableTable,
     type ModelManager,
     type ObservableCollection,
+    ProjectSettings,
     type Serialized,
     Signal,
     VisualNode,
@@ -169,7 +170,7 @@ export function createMockDocument(overrides: MockDocumentOverrides = {}): IDocu
         dispose: () => {},
     });
 
-    Object.assign(doc, { analyses: new AnalysisManager(doc) });
+    Object.assign(doc, { analyses: new AnalysisManager(doc), settings: new ProjectSettings(doc) });
     doc.dispose = () => doc.analyses.dispose();
 
     // patch visual.document to point to this doc

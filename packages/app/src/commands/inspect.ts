@@ -4,6 +4,7 @@
 import {
     CommandStore,
     command,
+    documentLengthUnit,
     GetOrSelectNodeStep,
     GetOrSelectShapeStep,
     type IDocument,
@@ -50,7 +51,7 @@ export class InspectMeasureCommand extends MultistepCommand {
             name: "Measure",
             kind: "measure",
             sources: sources.map((source) => source.value),
-            settings: { unit: "mm", precision: 3 },
+            settings: { unit: documentLengthUnit(this.document), precision: 3 },
             visible: true,
         });
         PubSub.default.pub("showAnalysisPanel", node);

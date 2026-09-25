@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type CadExportOptions,
     type Deletable,
     EditableShapeNode,
     type FolderNode,
@@ -55,14 +56,14 @@ export class OccShapeConverter implements IShapeConverter {
         });
     };
 
-    convertToIGES(...shapes: IShape[]): Result<string> {
+    convertToIGES(shapes: IShape[], options?: CadExportOptions): Result<string> {
         const occShapes = shapes.map((shape) => {
             if (shape instanceof OccShape) {
                 return shape.shape;
             }
             throw new Error("Shape is not an OccShape");
         });
-        return Result.ok(wasm.Converter.convertToIges(occShapes));
+        return Result.ok(wasm.Converter.convertToIges(occShapes, options?.lengthUnit ?? "mm"));
     }
 
     convertFromIGES(document: IDocument, iges: Uint8Array): Result<FolderNode> {
@@ -100,14 +101,14 @@ export class OccShapeConverter implements IShapeConverter {
         });
     };
 
-    convertToSTEP(...shapes: IShape[]): Result<string> {
+    convertToSTEP(shapes: IShape[], options?: CadExportOptions): Result<string> {
         const occShapes = shapes.map((shape) => {
             if (shape instanceof OccShape) {
                 return shape.shape;
             }
             throw new Error("Shape is not an OccShape");
         });
-        return Result.ok(wasm.Converter.convertToStep(occShapes));
+        return Result.ok(wasm.Converter.convertToStep(occShapes, options?.lengthUnit ?? "mm"));
     }
 
     convertFromSTEP(document: IDocument, step: Uint8Array): Result<FolderNode> {

@@ -668,8 +668,8 @@ interface EmbindModule {
     convertFromStep(_0: Uint8Array): ShapeNode | undefined;
     convertFromIges(_0: Uint8Array): ShapeNode | undefined;
     convertFromStl(_0: Uint8Array): ShapeNode | undefined;
-    convertToStep(_0: Array<TopoDS_Shape>): string;
-    convertToIges(_0: Array<TopoDS_Shape>): string;
+    convertToStep(_0: Array<TopoDS_Shape>, _1: EmbindString): string;
+    convertToIges(_0: Array<TopoDS_Shape>, _1: EmbindString): string;
   };
   ShapeResult: {};
   RemoveFilletResult: {};

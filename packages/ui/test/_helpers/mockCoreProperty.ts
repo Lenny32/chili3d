@@ -21,9 +21,11 @@ rs.mock("@chili3d/core", () => {
         ObservableCollectionMock,
         PubSubMock,
         I18nMock,
+        unitExportsMock,
     } = rs.hoisted(() => require("./coreMocks"));
     return {
         ...actual,
+        ...unitExportsMock(),
         Localize: LocalizeMock,
         Binding: BindingMock,
         PathBinding: PathBindingMock,

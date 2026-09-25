@@ -6,13 +6,19 @@ import {
     CancelableCommand,
     Combobox,
     command,
+    documentLengthUnit,
     download,
+    exportLengthUnit,
     I18n,
     type IApplication,
     type ICommand,
+    LENGTH_UNIT_LABELS,
+    LENGTH_UNITS_LIST,
+    type LengthUnit,
     PropertyUtils,
     PubSub,
     property,
+    Result,
     readFilesAsync,
     SelectNodeStep,
     type VisualNode,
@@ -47,7 +53,59 @@ export class Export extends CancelableCommand {
         return this.getPrivateValue("format", ".step");
     }
     public set format(value: string) {
-        this.setProperty("format", value);
+        this.setProperty("format", value, () => this.emitUnitChanged());
+    }
+
+    /**
+     * The unit the file is written in. It starts at the project unit on every export — the
+     * command's cached options must not carry one project's override into the next — so the
+     * choice lives in a plain field rather than the cached private value.
+     */
+    @property("file.outputUnit", {
+        combobox: Combobox.from<LengthUnit>([...LENGTH_UNITS_LIST], {
+            convert: (unit: LengthUnit) => Result.ok(I18n.translate(LENGTH_UNIT_LABELS[unit]) ?? unit),
+        }),
+        dependencies: [{ property: "hasFixedUnit", value: false }],
+    })
+    public get outputUnit(): LengthUnit {
+        // The global app, like the constructor: the dialog reads this before execute assigns one.
+        const projectUnit = documentLengthUnit(app.activeView?.document);
+        return exportLengthUnit(this.unitHandling, this.unitOverride ?? projectUnit);
+    }
+    public set outputUnit(value: LengthUnit) {
+        const old = this.outputUnit;
+        this.unitOverride = value;
+        if (old !== value) this.emitUnitChanged();
+    }
+    private unitOverride: LengthUnit | undefined;
+
+    /** Read by the unit picker's visibility: a fixed-unit format offers no choice. */
+    public get hasFixedUnit(): boolean {
+        return this.unitHandling.kind === "fixed";
+    }
+
+    /** What the file will hold, in words: which unit, and whether the importer must be told it. */
+    @property("file.unitInfo", { type: "info" })
+    public get unitInfo(): string {
+        const format = this.suffix.slice(1).toUpperCase();
+        const unit = this.outputUnit;
+        const key =
+            this.unitHandling.kind === "embedded"
+                ? "file.unitInfo.embedded{0}{1}"
+                : this.unitHandling.kind === "fixed"
+                  ? "file.unitInfo.fixed{0}{1}"
+                  : "file.unitInfo.none{0}{1}";
+        return I18n.translate(key, format, unit) ?? "";
+    }
+
+    private get unitHandling() {
+        return app.dataExchange.exportUnitHandling?.(this.format) ?? { kind: "none" as const };
+    }
+
+    private emitUnitChanged() {
+        this.emitPropertyChanged("outputUnit", this.outputUnit);
+        this.emitPropertyChanged("hasFixedUnit", this.hasFixedUnit);
+        this.emitPropertyChanged("unitInfo", this.unitInfo);
     }
 
     @property("option.command.merge")
@@ -96,7 +154,9 @@ export class Export extends CancelableCommand {
     }
 
     private async exportMergedAsync(nodes: VisualNode[]) {
-        const data = await this.application.dataExchange.export(this.format, nodes);
+        const data = await this.application.dataExchange.export(this.format, nodes, {
+            lengthUnit: this.outputUnit,
+        });
         if (!data) return;
         download(data, `${nodes[0].name}${this.suffix}`);
     }
@@ -108,7 +168,9 @@ export class Export extends CancelableCommand {
         const usedNames = new Set<string>();
 
         for (const node of nodes) {
-            const data = await this.application.dataExchange.export(this.format, [node]);
+            const data = await this.application.dataExchange.export(this.format, [node], {
+                lengthUnit: this.outputUnit,
+            });
             if (!data) continue;
             zip.file(this.uniqueFileName(node.name, usedNames), new Blob(data));
         }

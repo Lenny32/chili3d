@@ -19,6 +19,7 @@ rs.mock("../../src/property/common.module.css", () => ({
 
 rs.mock("../../src/property/input.module.css", () => ({
     box: "ip-box",
+    unit: "ip-unit",
 }));
 
 rs.mock("../../src/project/toolBar.module.css", () => ({

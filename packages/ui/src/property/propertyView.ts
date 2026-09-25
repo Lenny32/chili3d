@@ -3,7 +3,9 @@
 
 import {
     ConstructionNode,
+    documentLengthUnit,
     FolderNode,
+    formatLengthForEditing,
     GroupNode,
     I18n,
     type IDocument,
@@ -16,16 +18,22 @@ import {
     PropertyUtils,
     PubSub,
     Transaction,
+    toMillimetres,
     VisualNode,
 } from "@chili3d/core";
 import { button, div, Expander, input, label } from "@chili3d/element";
 import { propertyControl } from "./complexPropertyUtils";
 import { FeatureListProperty } from "./featureListProperty";
 import { MatrixProperty } from "./matrixProperty";
+import { ProjectPropertiesPanel } from "./projectPropertiesPanel";
 import style from "./propertyView.module.css";
+
+/** What the panel shows now, so a length-unit change can redraw it in the new unit. */
+type Shown = { readonly document: IDocument; readonly nodes: INode[] } | { readonly document: IDocument };
 
 export class PropertyView extends HTMLElement {
     private readonly panel = div({ className: style.panel });
+    private shown: Shown | undefined;
 
     constructor(props: { className: string }) {
         super();
@@ -38,7 +46,32 @@ export class PropertyView extends HTMLElement {
             this.panel,
         );
         PubSub.default.sub("showProperties", this.handleShowProperties);
+        PubSub.default.sub("showProjectProperties", this.handleShowProjectProperties);
         PubSub.default.sub("activeViewChanged", this.handleActiveViewChanged);
+    }
+
+    private readonly handleShowProjectProperties = (document: IDocument) => {
+        this.removeProperties();
+        this.watch({ document });
+        this.panel.append(new ProjectPropertiesPanel(document));
+    };
+
+    /**
+     * Every length field formats its value when it is built, so a unit change rebuilds the
+     * panel rather than asking each control to reformat itself.
+     */
+    private readonly handleSettingsChanged = (property: string) => {
+        const shown = this.shown;
+        if (property !== "lengthUnit" || shown === undefined || !("nodes" in shown)) return;
+        this.handleShowProperties(shown.document, shown.nodes);
+    };
+
+    private watch(shown: Shown | undefined) {
+        if (this.shown?.document !== shown?.document) {
+            this.shown?.document.settings?.removePropertyChanged(this.handleSettingsChanged);
+            shown?.document.settings?.onPropertyChanged(this.handleSettingsChanged);
+        }
+        this.shown = shown;
     }
 
     private readonly handleActiveViewChanged = (view: IView | undefined) => {
@@ -50,6 +83,7 @@ export class PropertyView extends HTMLElement {
 
     private readonly handleShowProperties = (document: IDocument, nodes: INode[]) => {
         this.removeProperties();
+        this.watch(nodes.length === 0 ? undefined : { document, nodes: [...nodes] });
         if (nodes.length === 0) return;
         this.addModel(document, nodes);
         this.addGeometry(nodes, document);
@@ -133,15 +167,16 @@ export class PropertyView extends HTMLElement {
                 }),
             );
         }
+        const unit = documentLengthUnit(node.document);
         this.panel.append(
-            label({ textContent: new Localize("construction.displaySize") }),
+            label({ textContent: `${I18n.translate("construction.displaySize")} (${unit})` }),
             input({
                 type: "number",
-                min: "1",
+                min: "0",
                 step: "any",
-                value: String(node.displaySize),
+                value: formatLengthForEditing(node.displaySize, unit),
                 onchange: (event) => {
-                    const size = Number((event.target as HTMLInputElement).value);
+                    const size = toMillimetres(Number((event.target as HTMLInputElement).value), unit);
                     if (!Number.isFinite(size) || size <= 0) return;
                     Transaction.execute(node.document, "edit construction display", () => {
                         node.displaySize = size;

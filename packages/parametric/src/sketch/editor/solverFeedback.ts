@@ -1,10 +1,11 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { PubSub } from "@chili3d/core";
-import { ConstraintKind, isStructuralConstraint, toDisplayDatum } from "../sketchModel";
+import { documentLengthUnit, PubSub } from "@chili3d/core";
+import { ConstraintKind, isStructuralConstraint } from "../sketchModel";
 import type { SolveOutcome } from "../solver";
 import { analyzeConstraints, applyDimensions, suggestDimensions } from "./constraintAnalyzer";
+import { formatDatum } from "./dimensionLayout";
 import type { SketchEditor } from "./sketchEditor";
 import style from "./solverFeedback.module.css";
 
@@ -92,7 +93,7 @@ export class SolverFeedback {
                   : "";
             this.button(
                 row,
-                `#${c.id} ${constraintLabel(c.kind)}${c.datum === undefined ? "" : ` = ${typeof c.datum === "number" ? toDisplayDatum(c.kind, c.datum) : c.datum}`}${suffix}`,
+                `#${c.id} ${constraintLabel(c.kind)}${c.datum === undefined ? "" : ` = ${formatDatum(c.kind, c.datum, documentLengthUnit(this.editor.document))}`}${suffix}`,
                 () => this.editor.annotations.selectConstraint(c.id),
             );
             if (c.datum !== undefined || c.kind === ConstraintKind.Fix)
@@ -119,7 +120,7 @@ export class SolverFeedback {
 
     showDimensionReview(): void {
         this.review.replaceChildren();
-        const suggestions = suggestDimensions(this.editor.solver);
+        const suggestions = suggestDimensions(this.editor.solver, documentLengthUnit(this.editor.document));
         const title = document.createElement("p");
         title.textContent = suggestions.length
             ? "Review dimensions before applying:"

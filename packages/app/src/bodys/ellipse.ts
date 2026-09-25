@@ -30,7 +30,7 @@ export class EllipseNode extends FacebaseNode {
     }
 
     @serialize()
-    @property("circle.center")
+    @property("circle.center", { quantity: "length" })
     get center() {
         return this.getPrivateValue("center");
     }
@@ -39,7 +39,7 @@ export class EllipseNode extends FacebaseNode {
     }
 
     @serialize()
-    @property("ellipse.majorRadius")
+    @property("ellipse.majorRadius", { quantity: "length" })
     get majorRadius() {
         return this.getPrivateValue("majorRadius");
     }
@@ -47,7 +47,7 @@ export class EllipseNode extends FacebaseNode {
         this.setPropertyEmitShapeChanged("majorRadius", radius);
     }
     @serialize()
-    @property("ellipse.minorRadius")
+    @property("ellipse.minorRadius", { quantity: "length" })
     get minorRadius() {
         return this.getPrivateValue("minorRadius");
     }

@@ -8,6 +8,7 @@ import type { ModelManager } from "./modelManager";
 import type { IVariableTable } from "./parameters/variableTable";
 import type { IPicker, ISelection } from "./selection";
 import type { Serialized } from "./serialize";
+import type { ProjectSettings } from "./units/projectSettings";
 import type { Act, IVisual } from "./visual";
 
 export const DOCUMENT_FILE_EXTENSION = ".cd";
@@ -24,6 +25,8 @@ export interface IDocument extends IPropertyChanged, IDisposable {
     readonly modelManager: ModelManager;
     /** Document-wide parameters shared by every body and sketch (see `variableTable.ts`). */
     readonly variables: IVariableTable;
+    /** Project properties (length unit, ...), shown under the Items tree's Project Properties row. */
+    readonly settings: ProjectSettings;
     name: string;
     acts: ObservableCollection<Act>;
     userData?: Record<string, unknown>;

@@ -6,9 +6,12 @@ import {
     type AnalysisManager,
     type AnalysisResult,
     CurveUtils,
+    formatMeasure,
     type IEdge,
     type IFace,
     type IShape,
+    isLengthUnit,
+    lengthUnitSymbol,
     MeshDataUtils,
     Plane,
     Result,
@@ -30,13 +33,12 @@ function formatValue(
     dimension: 1 | 2 | 3,
     context: AnalysisContext,
 ): { text: string; unit: string } {
-    const unit = String(context.settings["unit"] ?? "mm");
-    if (!["mm", "cm", "m", "in"].includes(unit)) throw new Error(`Unsupported measurement unit: ${unit}`);
-    const factor = unit === "cm" ? 10 : unit === "m" ? 1000 : unit === "in" ? 25.4 : 1;
-    const precision = measurementPrecision(context);
+    const unit = context.settings["unit"] ?? "mm";
+    if (!isLengthUnit(unit)) throw new Error(`Unsupported measurement unit: ${String(unit)}`);
+    const decimals = measurementPrecision(context);
     return {
-        text: (value / factor ** dimension).toFixed(precision),
-        unit: `${unit}${dimension === 1 ? "" : dimension === 2 ? "²" : "³"}`,
+        text: formatMeasure(value, dimension, unit, { decimals }),
+        unit: lengthUnitSymbol(unit, dimension),
     };
 }
 

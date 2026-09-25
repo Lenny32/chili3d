@@ -43,6 +43,8 @@ export interface PubSubEventMap {
     showInput: (text: string, handler: (text: string) => Result<string, I18nKeys>) => void;
     showPermanent: (action: () => Promise<void>, message: I18nKeys, ...args: any[]) => void;
     showProperties(document: IDocument, nodes: INode[]): void;
+    /** The Items tree's Project Properties row was chosen: show the document's settings. */
+    showProjectProperties(document: IDocument): void;
     showSelectionControl: (controller: AsyncController) => void;
     showToast: (message: I18nKeys, ...args: any[]) => void;
     statusBarTip: (tip: I18nKeys) => void;

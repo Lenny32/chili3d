@@ -7,7 +7,9 @@ import {
     CancelableCommand,
     type Combobox,
     CommandStore,
+    documentLengthUnit,
     EMPTY_SCOPE,
+    formatLengthParameter,
     I18n,
     type I18nKeys,
     type ICancelableCommand,
@@ -15,13 +17,18 @@ import {
     type IDisposable,
     type IDocument,
     isCancelableCommand,
+    isLengthProperty,
+    LengthConverter,
     Localize,
+    lengthParameterFromInput,
     Observable,
+    type ParameterValue,
     PathBinding,
     type Property,
     PropertyUtils,
     PubSub,
     parseParameterValue,
+    Result,
     resolveUnitSpec,
     type Scope,
     type UnitSpec,
@@ -220,6 +227,8 @@ export class CommandContext extends HTMLElement implements IDisposable {
 
         if (g.type === "materialId") {
             return this.materialEditor(g, noType);
+        } else if (g.type === "info") {
+            return this.newInfo(g, noType);
         } else if (g.combobox) {
             return this.newCombobox(g, g.combobox);
         }
@@ -234,6 +243,7 @@ export class CommandContext extends HTMLElement implements IDisposable {
             case "boolean":
                 return this.newCheckbox(g, noType);
             case "number":
+                if (isLengthProperty(g)) return this.newLengthInput(g, noType);
                 return this.newInput(g, noType, parseFloat);
             case "string":
                 return this.newInput(g, noType);
@@ -280,17 +290,29 @@ export class CommandContext extends HTMLElement implements IDisposable {
      * with a toast rather than written, because writing it would silently break the rebuild.
      */
     private newExpressionInput(g: Property, noType: any, expected: UnitSpec) {
+        const isLength = isLengthProperty(g);
+        const display = (value: ParameterValue) =>
+            isLength ? formatLengthParameter(value, this.lengthUnit()) : String(value ?? "");
+        let focusedText: string | undefined;
         return div(
             label({ textContent: new Localize(g.display) }),
             input({
                 type: "text",
                 className: style.input,
-                value: new Binding(noType, g.name),
+                value: new Binding(noType, g.name, {
+                    convert: (value: ParameterValue) => Result.ok(display(value)),
+                }),
+                onfocus: (e) => {
+                    focusedText = (e.target as HTMLInputElement).value;
+                },
                 onblur: (e) => {
                     const box = e.target as HTMLInputElement;
                     const text = box.value;
-                    if (text === "") return;
-                    const value = parseParameterValue(text);
+                    // Untouched: a length shown rounded in another unit must not be written back.
+                    if (text === "" || text === focusedText) return;
+                    const value = isLength
+                        ? lengthParameterFromInput(text, this.lengthUnit(), this.parameterScope())
+                        : parseParameterValue(text);
                     if (typeof value === "string") {
                         const resolved = resolveUnitSpec(value, this.parameterScope(), expected);
                         if (!resolved.isOk) {
@@ -298,19 +320,68 @@ export class CommandContext extends HTMLElement implements IDisposable {
                             // The command refused the text, so the field must stop showing it:
                             // the property still holds the old value, and a binding only
                             // re-renders on a property-changed emit that never came.
-                            box.value = String(noType[g.name] ?? "");
+                            box.value = display(noType[g.name]);
                             return;
                         }
                     }
                     noType[g.name] = value;
+                    focusedText = box.value;
                 },
                 onkeydown: (e) => {
                     e.stopPropagation();
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 },
             }),
+            ...(isLength ? [this.unitLabel()] : []),
         );
     }
+
+    /** A plain millimetre number, shown and typed in the project unit (`1 in` is accepted too). */
+    private newLengthInput(g: Property, noType: any) {
+        const converter = new LengthConverter(this.lengthUnit);
+        let focusedText: string | undefined;
+        return div(
+            label({ textContent: new Localize(g.display) }),
+            input({
+                type: "text",
+                className: style.input,
+                value: new Binding(noType, g.name, converter),
+                onfocus: (e) => {
+                    focusedText = (e.target as HTMLInputElement).value;
+                },
+                onblur: (e) => {
+                    const box = e.target as HTMLInputElement;
+                    if (box.value === focusedText) return;
+                    const value = converter.convertBack(box.value);
+                    if (!value.isOk) {
+                        PubSub.default.pub("showToast", "error.default:{0}", value.error);
+                        box.value = converter.convert(noType[g.name]).unchecked() ?? "";
+                        return;
+                    }
+                    noType[g.name] = value.value;
+                    focusedText = box.value;
+                },
+                onkeydown: (e) => {
+                    e.stopPropagation();
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                },
+            }),
+            this.unitLabel(),
+        );
+    }
+
+    private unitLabel() {
+        return span({ className: style.unit, textContent: this.lengthUnit() });
+    }
+
+    /** A read-only line of text the command computes (e.g. what unit an export writes). */
+    private newInfo(g: Property, noType: any) {
+        return div(span({ className: style.info, textContent: new Binding(noType, g.name) }));
+    }
+
+    /** The unit lengths are typed in: the command's document's, millimetres without one. */
+    private readonly lengthUnit = () =>
+        documentLengthUnit((this.command as { document?: IDocument }).document);
 
     /**
      * The document's parameters, for judging an expression typed into a command field.

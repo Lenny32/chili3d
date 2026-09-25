@@ -534,6 +534,69 @@ describe("dimension commands", () => {
         }
     });
 
+    test("editDatum shows and reads a length in the project unit", () => {
+        const { doc, dialog, restorePub, restoreFactory } = setup();
+        try {
+            doc.settings.lengthUnit = "cm";
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            editor.solver.addLine(0, 0, 100, 0);
+            const id = editor.solver.addConstraint({
+                kind: ConstraintKind.P2PDistance,
+                refs: [
+                    { entityId: 1, pointIndex: 0 },
+                    { entityId: 1, pointIndex: 1 },
+                ],
+                datum: 100,
+            });
+            editor.solve(true);
+
+            editor.editDatum(id);
+            expect(dialogInput(dialog).value).toBe("10");
+            expect(dialog.content?.textContent).toContain("cm");
+            // 7.5 cm is 75 mm; `1 in` would be 25.4 mm whatever the project unit.
+            expect(confirmDialog(dialog, "7.5")).toBe(true);
+            expect(editor.solver.toData().constraints[0].datum).toBeCloseTo(75);
+
+            editor.editDatum(id);
+            expect(confirmDialog(dialog, "1 in")).toBe(true);
+            expect(editor.solver.toData().constraints[0].datum).toBeCloseTo(25.4);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
+    test("editDatum confirmed unchanged keeps the exact stored length", () => {
+        const { doc, dialog, restorePub, restoreFactory } = setup();
+        try {
+            doc.settings.lengthUnit = "in";
+            const node = new SketchNode({ document: doc, plane: Plane.XY });
+            const editor = SketchEditor.enter(node);
+            editor.solver.addLine(0, 0, 100, 0);
+            const id = editor.solver.addConstraint({
+                kind: ConstraintKind.P2PDistance,
+                refs: [
+                    { entityId: 1, pointIndex: 0 },
+                    { entityId: 1, pointIndex: 1 },
+                ],
+                datum: 100,
+            });
+            editor.solve(true);
+
+            for (let i = 0; i < 5; i++) {
+                editor.editDatum(id);
+                expect(confirmDialog(dialog, dialogInput(dialog).value)).toBe(true);
+            }
+            expect(editor.solver.toData().constraints[0].datum).toBe(100);
+            editor.exit();
+        } finally {
+            restorePub();
+            restoreFactory();
+        }
+    });
+
     test("radius constraint is created at placement, before the dialog is confirmed", async () => {
         const { app, doc, view, dialog, restorePub, restoreFactory } = setup();
         try {

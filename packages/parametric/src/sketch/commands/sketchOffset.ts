@@ -8,7 +8,7 @@ import { SketchGeometryCommand } from "./sketchGeometryCommand";
 export class SketchOffsetCommand extends SketchGeometryCommand {
     protected readonly operation = "offset";
 
-    @property("sketch.offsetDistance")
+    @property("sketch.offsetDistance", { quantity: "length" })
     get distance(): number {
         return this.getPrivateValue("distance", 1);
     }

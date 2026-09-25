@@ -19,14 +19,14 @@ export class SketchMoveCommand extends SketchUtilityCommand {
     set numeric(value: boolean) {
         this.setProperty("numeric", value);
     }
-    @property("sketch.moveX")
+    @property("sketch.moveX", { quantity: "length" })
     get dx(): number {
         return this.getPrivateValue("dx", 0);
     }
     set dx(value: number) {
         if (Number.isFinite(value)) this.setProperty("dx", value);
     }
-    @property("sketch.moveY")
+    @property("sketch.moveY", { quantity: "length" })
     get dy(): number {
         return this.getPrivateValue("dy", 0);
     }

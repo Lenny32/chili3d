@@ -60,6 +60,7 @@ export function createMockApplication(overrides: MockApplicationOverrides = {}):
             export: async () => new Blob(),
             importFormats: () => [] as string[],
             exportFormats: () => [] as string[],
+            exportUnitHandling: () => ({ kind: "none" }),
             ...overrides.dataExchange,
         } as IDataExchange,
         services: overrides.services ?? [],

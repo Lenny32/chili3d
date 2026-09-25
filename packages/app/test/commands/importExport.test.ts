@@ -401,3 +401,83 @@ async function zipFileNames(blob: Blob): Promise<string[]> {
     const zip = await JSZip.loadAsync(blob);
     return Object.keys(zip.files).sort();
 }
+
+describe("Export output unit", () => {
+    /** A global app whose active project reads in `unit`; STEP records its unit, STL does not. */
+    function installUnitApp(unit: "mm" | "cm" | "in") {
+        const document = createMockDocument();
+        document.settings.load({ lengthUnit: unit });
+        const exports: { format: string; lengthUnit: unknown }[] = [];
+        const stub = {
+            activeView: { document },
+            dataExchange: {
+                exportFormats: () => [".step", ".stl"],
+                exportUnitHandling: (format: string) =>
+                    format === ".step" ? { kind: "embedded" as const } : { kind: "none" as const },
+                export: (format: string, _nodes: unknown[], options?: { lengthUnit?: unknown }) => {
+                    exports.push({ format, lengthUnit: options?.lengthUnit });
+                    return Promise.resolve([new ArrayBuffer(8)]);
+                },
+            },
+        };
+        const previous = Object.getOwnPropertyDescriptor(globalThis, "app");
+        Object.defineProperty(globalThis, "app", { configurable: true, get: () => stub });
+        return {
+            stub,
+            exports,
+            restore: () => {
+                if (previous) Object.defineProperty(globalThis, "app", previous);
+            },
+        };
+    }
+
+    test("defaults to the project unit on every export", () => {
+        const env = installUnitApp("cm");
+        try {
+            const first = new Export();
+            expect(first.outputUnit).toBe("cm");
+            first.outputUnit = "in";
+            expect(first.outputUnit).toBe("in");
+            // A new export starts from the project again, not from the last override.
+            expect(new Export().outputUnit).toBe("cm");
+        } finally {
+            env.restore();
+        }
+    });
+
+    test("names the output unit and whether the importer must be told it", () => {
+        const env = installUnitApp("cm");
+        try {
+            const cmd = new Export();
+            cmd.format = ".step";
+            expect(cmd.unitInfo).toBe(
+                "file.unitInfo.embedded{0}{1}".replace("{0}", "STEP").replace("{1}", "cm"),
+            );
+            cmd.format = ".stl";
+            expect(cmd.unitInfo).toContain("STL");
+            expect(cmd.unitInfo).toContain("cm");
+            expect(cmd.hasFixedUnit).toBe(false);
+        } finally {
+            env.restore();
+        }
+    });
+
+    test("hands the chosen unit to the data exchange", async () => {
+        const env = installUnitApp("in");
+        const ctx = setupExportContext();
+        try {
+            const cmd = new Export();
+            cmd.format = ".stl";
+            (cmd as any)._application = env.stub;
+            (cmd as any).selectNodesAsync = () => Promise.resolve([{ name: "a" }]);
+
+            await (cmd as any).executeAsync();
+            await ctx.permanentCallback!();
+
+            expect(env.exports).toEqual([{ format: ".stl", lengthUnit: "in" }]);
+        } finally {
+            ctx.restore();
+            env.restore();
+        }
+    });
+});

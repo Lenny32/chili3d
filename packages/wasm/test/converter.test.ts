@@ -101,7 +101,7 @@ describe("BREP conversion", () => {
 describe("STEP conversion", () => {
     test("box → STEP produces valid STEP content", () => {
         const box = createBox(factory, 10, 10, 10);
-        const result = converter.convertToSTEP(box);
+        const result = converter.convertToSTEP([box]);
         expect(result.isOk).toBe(true);
         const step = result.value;
         expect(typeof step).toBe("string");
@@ -114,14 +114,14 @@ describe("STEP conversion", () => {
     test("multiple shapes to STEP", () => {
         const box = createBox(factory, 10, 10, 10);
         const sphere = unwrapOk(factory.sphere(XYZ.zero, 5));
-        const result = converter.convertToSTEP(box, sphere);
+        const result = converter.convertToSTEP([box, sphere]);
         expect(result.isOk).toBe(true);
         expect(result.value.length).toBeGreaterThan(0);
     });
 
     test("convertToSTEP with non-OccShape throws", () => {
         const fake = new MockShape({ shapeType: ShapeTypes.solid });
-        expect(() => converter.convertToSTEP(fake)).toThrow("Shape is not an OccShape");
+        expect(() => converter.convertToSTEP([fake])).toThrow("Shape is not an OccShape");
     });
 });
 
@@ -132,7 +132,7 @@ describe("STEP conversion", () => {
 describe("IGES conversion", () => {
     test("box → IGES produces valid IGES content", () => {
         const box = createBox(factory, 10, 10, 10);
-        const result = converter.convertToIGES(box);
+        const result = converter.convertToIGES([box]);
         expect(result.isOk).toBe(true);
         const iges = result.value;
         expect(typeof iges).toBe("string");
@@ -144,14 +144,14 @@ describe("IGES conversion", () => {
     test("multiple shapes to IGES", () => {
         const box = createBox(factory, 10, 10, 10);
         const sphere = unwrapOk(factory.sphere(XYZ.zero, 5));
-        const result = converter.convertToIGES(box, sphere);
+        const result = converter.convertToIGES([box, sphere]);
         expect(result.isOk).toBe(true);
         expect(result.value.length).toBeGreaterThan(0);
     });
 
     test("convertToIGES with non-OccShape throws", () => {
         const fake = new MockShape({ shapeType: ShapeTypes.solid });
-        expect(() => converter.convertToIGES(fake)).toThrow("Shape is not an OccShape");
+        expect(() => converter.convertToIGES([fake])).toThrow("Shape is not an OccShape");
     });
 });
 

@@ -18,6 +18,7 @@ import {
     Transaction,
     VisualNode,
 } from "@chili3d/core";
+import { ProjectPropertiesItem } from "./projectPropertiesItem";
 import style from "./tree.module.css";
 import { TreeItem } from "./treeItem";
 import { TreeGroup } from "./treeItemGroup";
@@ -30,20 +31,25 @@ export class Tree extends HTMLElement {
     private highlightedGroup: TreeGroup | undefined;
     private lastClicked: INode | undefined;
     private lastSelected: INode[] | undefined;
+    private readonly projectProperties: ProjectPropertiesItem;
 
     constructor(private document: IDocument) {
         super();
         this.className = style.panel;
+        this.projectProperties = new ProjectPropertiesItem(document);
         this.initializeTree(document);
     }
 
     private initializeTree(document: IDocument) {
         this.addAllNodes(document, this, document.modelManager.rootNode);
+        const root = this.nodeMap.get(document.modelManager.rootNode);
+        if (root instanceof TreeGroup) root.pinFirst(this.projectProperties);
         this.addEvents(this);
     }
 
     connectedCallback() {
         PubSub.default.sub("analysisDisplayChanged", this.onAnalysisDisplayChanged);
+        PubSub.default.sub("showProjectProperties", this.onShowProjectProperties);
         this.document.modelManager.addNodeObserver(this.handleNodeChanged);
         this.document.modelManager.onPropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.sub(this.handleSelectionChanged);
@@ -51,6 +57,7 @@ export class Tree extends HTMLElement {
 
     disconnectedCallback() {
         PubSub.default.remove("analysisDisplayChanged", this.onAnalysisDisplayChanged);
+        PubSub.default.remove("showProjectProperties", this.onShowProjectProperties);
         this.document.modelManager.removeNodeObserver(this.handleNodeChanged);
         this.document.modelManager.removePropertyChanged(this.handleCurrentNodeChanged);
         this.document.selection.onNodeChanged.remove(this.handleSelectionChanged);
@@ -77,6 +84,8 @@ export class Tree extends HTMLElement {
 
     dispose(): void {
         PubSub.default.remove("analysisDisplayChanged", this.onAnalysisDisplayChanged);
+        PubSub.default.remove("showProjectProperties", this.onShowProjectProperties);
+        this.projectProperties.dispose();
         this.lastClicked = undefined;
         this.dragging = undefined;
         this.highlightedGroup = undefined;
@@ -92,6 +101,10 @@ export class Tree extends HTMLElement {
 
     private readonly onAnalysisDisplayChanged = (document: IDocument) => {
         if (document === this.document) this.nodeMap.forEach((item) => item.refreshComponentColor());
+    };
+
+    private readonly onShowProjectProperties = (document: IDocument) => {
+        if (document === this.document) this.projectProperties.classList.add(style.selected);
     };
 
     readonly handleNodeChanged = (records: NodeRecord[]) => {
@@ -127,6 +140,8 @@ export class Tree extends HTMLElement {
     }
 
     private readonly handleSelectionChanged = (selected: INode[]) => {
+        // Choosing a node moves the property panel off the project settings.
+        if (selected.length > 0) this.projectProperties.classList.remove(style.selected);
         this.lastSelected?.forEach((x) => {
             this.nodeMap.get(x)?.removeStyle(style.selected);
             this.selectedNodes.delete(x);

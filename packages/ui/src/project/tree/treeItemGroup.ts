@@ -11,6 +11,8 @@ export class TreeGroup extends TreeItem {
     readonly header: HTMLElement;
     readonly items: HTMLDivElement = div({ className: `${style.container} ${style.left16px}` });
     readonly expanderIcon: SVGSVGElement;
+    /** A row kept above every child node (the project's Project Properties row). */
+    private pinned: HTMLElement | undefined;
 
     constructor(document: IDocument, node: INodeLinkedList) {
         super(document, node);
@@ -102,8 +104,16 @@ export class TreeGroup extends TreeItem {
         return this;
     }
 
+    /** Keeps `element` as the first row: a node inserted "first" lands right after it. */
+    pinFirst(element: HTMLElement): void {
+        this.pinned = element;
+        this.items.prepend(element);
+    }
+
     insertAfter(item: TreeItem, child: TreeItem | null): void {
-        const referenceNode = child ? child.nextSibling : this.items.firstChild;
+        const first =
+            this.pinned?.parentNode === this.items ? this.pinned.nextSibling : this.items.firstChild;
+        const referenceNode = child ? child.nextSibling : first;
         this.items.insertBefore(item, referenceNode);
     }
 }

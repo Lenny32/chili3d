@@ -19,7 +19,7 @@ import {
     icon: "icon-thickSolid",
 })
 export class ThickSolidCommand extends MultistepCommand {
-    @property("option.command.thickness")
+    @property("option.command.thickness", { quantity: "length" })
     get thickness() {
         return this.getPrivateValue("thickness", 10);
     }

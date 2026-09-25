@@ -30,7 +30,7 @@ export class HelixNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.center")
+    @property("circle.center", { quantity: "length" })
     get origin(): XYZ {
         return this.getPrivateValue("origin");
     }
@@ -49,7 +49,7 @@ export class HelixNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.radius")
+    @property("circle.radius", { quantity: "length" })
     get radius() {
         return this.getPrivateValue("radius");
     }
@@ -58,7 +58,7 @@ export class HelixNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("helix.pitch")
+    @property("helix.pitch", { quantity: "length" })
     get pitch() {
         return this.getPrivateValue("pitch");
     }

@@ -28,7 +28,7 @@ export class RectNode extends FacebaseNode {
     }
 
     @serialize()
-    @property("rect.dx")
+    @property("rect.dx", { quantity: "length" })
     get dx() {
         return this.getPrivateValue("dx");
     }
@@ -37,7 +37,7 @@ export class RectNode extends FacebaseNode {
     }
 
     @serialize()
-    @property("rect.dy")
+    @property("rect.dy", { quantity: "length" })
     get dy() {
         return this.getPrivateValue("dy");
     }

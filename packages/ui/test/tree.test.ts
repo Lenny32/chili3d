@@ -125,6 +125,7 @@ function makeDoc(rootNode: MockNode): DocHarness {
                 remove: (h: (nodes: INode[]) => void) => selectionHandlers.delete(h),
             },
             setSelectedNodes: rs.fn((_nodes: INode[], _ctrl: boolean) => 0),
+            clearSelection: rs.fn(() => {}),
         } as unknown as MockDocumentOverrides["selection"],
     });
     return Object.assign(doc, {
@@ -461,6 +462,48 @@ describe("Tree", () => {
 
             expect(fixture.groupA.move).not.toHaveBeenCalled();
             expect(body.move).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("project properties row", () => {
+        const projectRow = () => {
+            const rootEl = fixture.tree.treeItem(fixture.root as unknown as INode) as TreeGroup;
+            return rootEl.items.firstElementChild as HTMLElement;
+        };
+
+        test("should be the project's first child, with no eye icon and no drag", () => {
+            fixture = createFixture();
+            const row = projectRow();
+            expect(row.tagName.toLowerCase()).toBe("tree-project-properties");
+            expect(row.draggable).toBe(false);
+            expect(row.querySelector(".ti-icon")).toBeNull();
+            // It is not a node: nothing in the node map points at it.
+            expect(fixture.tree.treeItem(fixture.groupA as unknown as INode)).not.toBe(row);
+        });
+
+        test("should stay first when a node is inserted at the top of the project", () => {
+            fixture = createFixture();
+            const model3 = new MockNode("model3");
+            model3.parent = fixture.root;
+
+            fixture.doc.emitNodeChanged([
+                { node: model3, newParent: fixture.root, newPrevious: undefined } as unknown as NodeRecord,
+            ]);
+
+            const row = projectRow();
+            expect(row.tagName.toLowerCase()).toBe("tree-project-properties");
+            expect(row.nextElementSibling).toBe(fixture.tree.treeItem(model3 as unknown as INode));
+        });
+
+        test("should clear the node selection and show the project settings on click", () => {
+            fixture = createFixture();
+            getPubSubPubs().length = 0;
+
+            projectRow().dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+            expect(fixture.doc.selection.clearSelection).toHaveBeenCalledTimes(1);
+            expect(getPubSubPubs()).toContainEqual({ topic: "showProjectProperties", args: [fixture.doc] });
+            expect(fixture.doc.selection.setSelectedNodes).not.toHaveBeenCalled();
         });
     });
 });

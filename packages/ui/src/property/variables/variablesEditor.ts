@@ -2,10 +2,13 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    documentLengthUnit,
     type EvaluatedVariables,
+    formatLengthForEditing,
     I18n,
     type I18nKeys,
     Localize,
+    lengthExpressionFromInput,
     type VariableData,
     type VariableType,
 } from "@chili3d/core";
@@ -147,8 +150,9 @@ export class VariablesEditor extends HTMLElement {
             },
             onblur: (e: FocusEvent) => {
                 const box = e.target as HTMLInputElement;
-                if (box.value !== (this.current(item.id)?.expression ?? "")) {
-                    this.content.setField(item.id, "expression", box.value);
+                const current = this.current(item.id);
+                if (box.value !== (current?.expression ?? "")) {
+                    this.content.setField(item.id, "expression", this.storedExpression(current, box.value));
                 }
                 this.refreshValues();
             },
@@ -156,6 +160,17 @@ export class VariablesEditor extends HTMLElement {
                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             },
         });
+    }
+
+    /**
+     * A length typed as a bare number is in the project unit, so the unit is written into the
+     * expression (`10` in a cm project stores `10 cm`) — the stored parameter then means the
+     * same size whatever unit the project is later shown in.
+     */
+    private storedExpression(item: VariableData | undefined, text: string): string {
+        if (item?.type !== "length") return text;
+        const unit = documentLengthUnit(this.content.document);
+        return lengthExpressionFromInput(text, unit, this.content.evaluate().scope);
     }
 
     /**
@@ -325,7 +340,7 @@ export class VariablesEditor extends HTMLElement {
             if (window.document.activeElement === cell) continue;
             const error = evaluated.errors.get(item.id);
             const value = evaluated.scope.get(item.name)?.value;
-            cell.value = error ?? (value === undefined ? "" : this.formatValue(value));
+            cell.value = error ?? (value === undefined ? "" : this.formatValue(value, item.type));
             cell.className =
                 error === undefined
                     ? `${style.cell} ${style.field} ${style.value}`
@@ -337,10 +352,14 @@ export class VariablesEditor extends HTMLElement {
     }
 
     /**
-     * Just the number: the app has no unit system to name one from. A length and an angle are
-     * both plain numbers here — the type says how a value is checked, not what it is called.
+     * The number, and for a length its project unit (lengths resolve to millimetres). An angle
+     * and a ratio stay plain numbers — the type says how a value is checked.
      */
-    private formatValue(value: number): string {
+    private formatValue(value: number, type: VariableType): string {
+        if (type === "length") {
+            const unit = documentLengthUnit(this.content.document);
+            return `${formatLengthForEditing(value, unit)} ${unit}`;
+        }
         // Four decimals is enough to judge a parameter without burying the number in noise.
         return String(Math.round(value * 1e4) / 1e4);
     }

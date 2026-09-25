@@ -180,6 +180,37 @@ describe("Document", () => {
         });
     });
 
+    describe("project settings", () => {
+        test("a new project reads in millimetres", () => {
+            expect(document.settings.lengthUnit).toBe("mm");
+            expect(document.serialize()["settings"]).toEqual({ lengthUnit: "mm" });
+        });
+
+        test("the length unit is saved per project and restored on reopening", async () => {
+            document.settings.lengthUnit = "in";
+            const loaded = await Document.load(mockApp, document.serialize());
+
+            try {
+                expect(loaded!.settings.lengthUnit).toBe("in");
+            } finally {
+                loaded?.dispose();
+            }
+        });
+
+        test("a project saved before project settings existed opens in millimetres", async () => {
+            const serialized = document.serialize();
+            delete serialized["settings"];
+
+            const loaded = await Document.load(mockApp, serialized);
+
+            try {
+                expect(loaded!.settings.lengthUnit).toBe("mm");
+            } finally {
+                loaded?.dispose();
+            }
+        });
+    });
+
     describe("serialize → deserialize roundtrip", () => {
         test("should restore id, name and userData through Document.load", async () => {
             document.userData = { layer: "roundtrip", count: 3 };

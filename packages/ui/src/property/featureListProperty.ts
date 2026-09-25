@@ -3,18 +3,23 @@
 
 import {
     Binding,
+    documentLengthUnit,
     type FeatureItem,
     type FeatureParameter,
     type FeatureReference,
+    formatLengthParameter,
     I18n,
     type I18nKeys,
     type IDocument,
     type IFeatureListNode,
     type INode,
+    LENGTH_UNITS,
     Localize,
+    lengthParameterFromInput,
     PubSub,
     Transaction,
     type UnitSpec,
+    unitSpecEquals,
 } from "@chili3d/core";
 import { div, input, span, svg } from "@chili3d/element";
 import { showDialog } from "../dialog";
@@ -180,9 +185,11 @@ export class FeatureListProperty extends HTMLElement {
 
     private textParamInput(item: FeatureItem, key: string, value: number | string, unit?: UnitSpec) {
         const expected = unitSpecLabelKey(unit);
-        return input({
+        const isLength = unit !== undefined && unitSpecEquals(unit, LENGTH_UNITS);
+        let focusedText = "";
+        const box = input({
             className: inputStyle.box,
-            value: this.formatParameterValue(value),
+            value: this.formatParameterValue(value, isLength),
             // What the slot measures — the value may be an expression, and the rebuild
             // rejects one of the wrong unit, so say up front what fits.
             title: expected === undefined ? "" : (I18n.translate(expected) ?? ""),
@@ -190,27 +197,51 @@ export class FeatureListProperty extends HTMLElement {
             // restores the trimmed display.
             onfocus: (e) => {
                 const box = e.target as HTMLInputElement;
-                box.value = String(value);
+                box.value = this.editableParameterValue(value, isLength);
+                focusedText = box.value;
                 box.select();
             },
-            onkeydown: (e) => this.handleKeyDown(e, item, key),
+            onkeydown: (e) => this.handleKeyDown(e, item, key, isLength, () => focusedText),
             onblur: (e) => {
                 const box = e.target as HTMLInputElement;
-                this.applyParameter(box, item, key);
+                this.applyParameter(box, item, key, isLength, focusedText);
                 // A applied change re-renders the list, detaching this box.
-                if (box.isConnected) box.value = this.formatParameterValue(value);
+                if (box.isConnected) box.value = this.formatParameterValue(value, isLength);
             },
         });
+        if (!isLength) return box;
+        return div(
+            { className: style.lengthInput },
+            box,
+            span({ className: inputStyle.unit, textContent: documentLengthUnit(this.document) }),
+        );
     }
 
-    private readonly handleKeyDown = (e: KeyboardEvent, item: FeatureItem, key: string) => {
+    private readonly handleKeyDown = (
+        e: KeyboardEvent,
+        item: FeatureItem,
+        key: string,
+        isLength: boolean,
+        focusedText: () => string,
+    ) => {
         e.stopPropagation();
-        if (e.key === "Enter") this.applyParameter(e.target as HTMLInputElement, item, key);
+        if (e.key === "Enter") {
+            this.applyParameter(e.target as HTMLInputElement, item, key, isLength, focusedText());
+        }
     };
 
-    /** Numbers display trimmed to 4 fraction digits; expression strings stay as-is. */
-    private formatParameterValue(value: number | string): string {
+    /**
+     * Numbers display trimmed to 4 fraction digits (a length in the project unit, at the
+     * precision that unit needs); expression strings stay as-is.
+     */
+    private formatParameterValue(value: number | string, isLength: boolean): string {
+        if (isLength) return formatLengthParameter(value, documentLengthUnit(this.document));
         return typeof value === "number" ? String(Number(value.toFixed(4))) : value;
+    }
+
+    /** What the focused box holds: the full value, a length in the project unit. */
+    private editableParameterValue(value: number | string, isLength: boolean): string {
+        return isLength ? formatLengthParameter(value, documentLengthUnit(this.document)) : String(value);
     }
 
     // --- floating menu ---
@@ -383,23 +414,43 @@ export class FeatureListProperty extends HTMLElement {
         });
     }
 
-    private applyParameter(box: HTMLInputElement, item: FeatureItem, key: string) {
+    private applyParameter(
+        box: HTMLInputElement,
+        item: FeatureItem,
+        key: string,
+        isLength: boolean,
+        focusedText: string,
+    ) {
         const current = item.parameters.find((x) => x.key === key)?.value;
         const text = box.value.trim();
         if (text === "") {
             PubSub.default.pub("showToast", "error.default:{0}", "invalid input");
-            box.value = String(current ?? "");
+            box.value =
+                current === undefined
+                    ? ""
+                    : this.editableParameterValue(current as number | string, isLength);
             return;
         }
-        if (text === String(current)) return;
+        // Untouched: a length shown in another unit is rounded, and writing it back would drift.
+        if (text === focusedText.trim() || (!isLength && text === String(current))) return;
         // A non-numeric value is kept as an expression string; a failure to resolve
         // it surfaces as a feature error on the row.
-        const asNumber = Number(text);
-        const value = Number.isFinite(asNumber) ? asNumber : text;
+        const value = isLength
+            ? lengthParameterFromInput(
+                  text,
+                  documentLengthUnit(this.document),
+                  this.document.variables.evaluate().scope,
+              )
+            : this.parseNumberOrExpression(text);
         Transaction.execute(this.document, "edit feature", () => {
             this.node.setFeatureParameter(item.id, key, value);
             this.document.visual.update();
         });
+    }
+
+    private parseNumberOrExpression(text: string): number | string {
+        const asNumber = Number(text);
+        return Number.isFinite(asNumber) ? asNumber : text;
     }
 
     private removeItem(item: FeatureItem) {

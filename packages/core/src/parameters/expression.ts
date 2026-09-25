@@ -2,9 +2,11 @@
 // See LICENSE file in the project root for full license information.
 
 import { Result } from "../foundation/result";
+import { isLengthUnit, toMillimetres } from "../units/lengthUnit";
 import {
     ANGLE_UNITS,
     combineUnitSpecs,
+    LENGTH_UNITS,
     mergeUnitSpecs,
     UNITLESS,
     type UnitSpec,
@@ -100,6 +102,10 @@ export function isConstantName(name: string): boolean {
  * subtract the exponents, `sin`/`cos`/`tan` take an angle and yield a ratio. Literals
  * are unitless and so are adoptable, which is what lets `depth = 50` and `w + 1` both
  * work while `w + angle` is rejected.
+ *
+ * A number or a parenthesized group may carry an explicit length unit — `10 cm`, `1in`,
+ * `(2 + 3) cm` — which converts it to millimetres and makes it a length. That is how a value typed in a non-millimetre project stays the same size when
+ * the project unit changes: the unit is written into the expression, not implied by it.
  */
 export function evaluateExpression(source: string, scope: Scope): Result<EvaluatedValue> {
     const parser = new Parser(source, scope);
@@ -245,8 +251,8 @@ class Parser {
         this.skipSpaces();
         const ch = this.source[this.pos];
         if (ch === undefined) return Result.err("Unexpected end of expression");
-        if (ch === "(") return this.parseParenthesized();
-        if (/\d|\./.test(ch)) return this.parseNumber();
+        if (ch === "(") return this.withUnitSuffix(this.parseParenthesized());
+        if (/\d|\./.test(ch)) return this.withUnitSuffix(this.parseNumber());
         if (/[A-Za-z_]/.test(ch)) return this.parseIdentifier();
         return Result.err(`Unexpected character: ${ch}`);
     }
@@ -259,6 +265,27 @@ class Parser {
         if (this.source[this.pos] !== ")") return Result.err("Missing closing parenthesis");
         this.pos++;
         return value;
+    }
+
+    /**
+     * An explicit length unit right after a number or a closing parenthesis. Nothing else may
+     * follow a value there (there is no implicit multiplication), so reading the word as a unit
+     * cannot change the meaning of an expression that parsed before — `2 * m` is still a
+     * variable. Only a unitless value takes one: `w cm` would scale a length a second time.
+     */
+    private withUnitSuffix(value: Result<EvaluatedValue>): Result<EvaluatedValue> {
+        if (!value.isOk) return value;
+        const match = /^\s*([A-Za-z]+)/.exec(this.source.slice(this.pos));
+        if (match === null) return value;
+        const rest = this.source.slice(this.pos + match[0].length).trimStart();
+        if (rest.startsWith("(")) return value; // a function call, reported as usual
+        const unit = match[1];
+        if (!isLengthUnit(unit)) return Result.err(`Unknown unit: ${unit}`);
+        if (!unitSpecEquals(value.value.unit, UNITLESS)) {
+            return Result.err(`Unit ${unit} applied to a value that already has a unit`);
+        }
+        this.pos += match[0].length;
+        return Result.ok({ value: toMillimetres(value.value.value, unit), unit: LENGTH_UNITS });
     }
 
     private parseNumber(): Result<EvaluatedValue> {

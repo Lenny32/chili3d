@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import { formatLength, type LengthUnit } from "@chili3d/core";
 import { ConstraintKind, entityRadius, type SketchConstraintData, type SketchData } from "../sketchModel";
 import type { SketchSolver } from "../solver";
 import { centerRef, lineRefs } from "../solverEntities";
@@ -10,8 +11,11 @@ export interface DimensionSuggestion {
     constraint: Omit<SketchConstraintData, "id">;
 }
 
-/** Structural analysis; no numerical solves on the pointer-move path. */
-export function analyzeConstraints(data: SketchData) {
+/**
+ * Structural analysis; no numerical solves on the pointer-move path. Suggestion labels read
+ * their lengths in `unit`; the suggested datums stay in millimetres.
+ */
+export function analyzeConstraints(data: SketchData, unit: LengthUnit = "mm") {
     const related = new Set<number>();
     const blocked = new Set<number>();
     for (const c of data.constraints) {
@@ -57,14 +61,14 @@ export function analyzeConstraints(data: SketchData) {
             const length = Math.hypot(e.params[2] - e.params[0], e.params[3] - e.params[1]);
             if (length > 1e-9)
                 suggestions.push({
-                    label: `Line #${e.id}: length ${length.toFixed(3)}`,
+                    label: `Line #${e.id}: length ${formatLength(length, unit, { suffix: true })}`,
                     constraint: { kind: ConstraintKind.P2PDistance, refs: lineRefs(e.id), datum: length },
                 });
         } else if (e.type === "circle" || e.type === "arc") {
             const radius = entityRadius(e);
             if (radius > 1e-9)
                 suggestions.push({
-                    label: `${e.type === "circle" ? "Circle" : "Arc"} #${e.id}: radius ${radius.toFixed(3)}`,
+                    label: `${e.type === "circle" ? "Circle" : "Arc"} #${e.id}: radius ${formatLength(radius, unit, { suffix: true })}`,
                     constraint: { kind: ConstraintKind.Radius, refs: [centerRef(e.id)], datum: radius },
                 });
         }
@@ -100,7 +104,7 @@ export function analyzeConstraints(data: SketchData) {
 }
 
 /** Review-time trial solves discard dimensions already implied by other relationships. */
-export function suggestDimensions(solver: SketchSolver): DimensionSuggestion[] {
+export function suggestDimensions(solver: SketchSolver, unit: LengthUnit = "mm"): DimensionSuggestion[] {
     const trial = solver.fork();
     try {
         const initial = trial.diagnose();
@@ -112,7 +116,7 @@ export function suggestDimensions(solver: SketchSolver): DimensionSuggestion[] {
         )
             return [];
         const accepted: DimensionSuggestion[] = [];
-        for (const suggestion of analyzeConstraints(trial.toData()).suggestions) {
+        for (const suggestion of analyzeConstraints(trial.toData(), unit).suggestions) {
             if (
                 !analyzeConstraints(trial.toData()).suggestions.some(
                     (s) => s.constraint.refs[0].entityId === suggestion.constraint.refs[0].entityId,

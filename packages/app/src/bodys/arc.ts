@@ -28,7 +28,7 @@ export class ArcNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.center")
+    @property("circle.center", { quantity: "length" })
     get center() {
         return this.getPrivateValue("center");
     }
@@ -37,7 +37,7 @@ export class ArcNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("arc.start")
+    @property("arc.start", { quantity: "length" })
     get start(): XYZ {
         return this.getPrivateValue("start");
     }

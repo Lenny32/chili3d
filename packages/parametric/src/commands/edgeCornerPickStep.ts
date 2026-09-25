@@ -3,6 +3,8 @@
 
 import {
     type AsyncController,
+    documentLengthUnit,
+    formatLength,
     type IDocument,
     type INodeFilter,
     type IStep,
@@ -89,7 +91,10 @@ export class EdgeCornerPickHandler extends SubshapeSelectionHandler {
             const value = Math.max(this.projectValue(view, event) - this._grabOffset, MIN_DRAG_VALUE);
             this.callbacks.setValue(value);
             this.refreshArrow(view);
-            PubSub.default.pub("showFloatTip", { level: "info", msg: value.toFixed(2) });
+            PubSub.default.pub("showFloatTip", {
+                level: "info",
+                msg: formatLength(value, documentLengthUnit(this.document), { suffix: true }),
+            });
             return;
         }
         super.pointerMove(view, event);

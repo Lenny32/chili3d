@@ -59,7 +59,7 @@ export class ShellCommand extends MultistepCommand {
         this.setProperty("intersection", value, this.redisplayTempShape);
     }
 
-    @property("option.command.thickness")
+    @property("option.command.thickness", { quantity: "length" })
     get thickness() {
         return this.getPrivateValue("thickness", 1);
     }

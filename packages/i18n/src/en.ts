@@ -540,6 +540,13 @@ export default {
         "error.input.unsupportedInputs": "Exceeds the maximum number of inputs",
         "error.select.twoEdges": "Please select two adjacent edges",
         "file.format": "Format",
+        "file.outputUnit": "Output unit",
+        "file.unitInfo": "Unit",
+        "file.unitInfo.embedded{0}{1}":
+            "{0} records its unit: coordinates are written in {1}, and importing applications scale them automatically.",
+        "file.unitInfo.none{0}{1}":
+            "{0} files carry no unit. Coordinates are written in {1}: the importing application must read the file as {1}.",
+        "file.unitInfo.fixed{0}{1}": "{0} always uses {1}: coordinates are converted to {1}.",
         "helix.pitch": "Pitch",
         "home.recent": "Recent Projects",
         "home.recent.empty": "No recent documents yet. Create or open a document to get started.",
@@ -710,6 +717,14 @@ export default {
         "prompt.selectedCount": "Selected",
         "properties.group.transform": "Transform",
         "properties.header": "Properties",
+        "project.properties": "Project Properties",
+        "project.lengthUnit": "Length unit",
+        "project.lengthUnit.hint":
+            "Lengths are shown and typed in this unit. The model keeps its physical size when the unit changes.",
+        "unit.length.mm": "Millimetres (mm)",
+        "unit.length.cm": "Centimetres (cm)",
+        "unit.length.m": "Metres (m)",
+        "unit.length.in": "Inches (in)",
         "features.consumeTools": "Remove tools",
         "features.header": "Features",
         "features.reselect": "Reselect",

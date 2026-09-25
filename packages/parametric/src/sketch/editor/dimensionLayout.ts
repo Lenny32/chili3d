@@ -12,20 +12,20 @@ export type { DimensionAnchor } from "../sketchModel";
 // `sketchModel` because the solver converts datums too and must not import the editor.
 export { toDisplayDatum, toStorageDatum } from "../sketchModel";
 
-import type { ParameterValue } from "@chili3d/core";
+import { formatLength, type LengthUnit, type ParameterValue } from "@chili3d/core";
 import { ConstraintKind, toDisplayDatum } from "../sketchModel";
 
 /**
  * The text a dimension annotation shows for a stored datum: an expression reads as
  * written — that name IS the user's intent — while a literal reads as its display
- * value. The radius `R` prefix stays with the caller, which knows the geometry; the
- * degree sign belongs to the datum itself.
+ * value — a length in the project `unit`. The radius `R` prefix stays with the caller,
+ * which knows the geometry; the degree sign belongs to the datum itself.
  */
-export function formatDatum(kind: ConstraintKind, value: ParameterValue): string {
+export function formatDatum(kind: ConstraintKind, value: ParameterValue, unit: LengthUnit = "mm"): string {
     if (typeof value === "string") return value;
     const display = toDisplayDatum(kind, value);
-    const suffix = kind === ConstraintKind.Angle ? "°" : "";
-    return `${display.toFixed(kind === ConstraintKind.Angle ? 1 : 2)}${suffix}`;
+    if (kind === ConstraintKind.Angle) return `${display.toFixed(1)}°`;
+    return formatLength(display, unit);
 }
 
 export interface DimensionGeometry {

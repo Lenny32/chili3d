@@ -28,7 +28,7 @@ export class ConeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.center")
+    @property("circle.center", { quantity: "length" })
     get center() {
         return this.getPrivateValue("center");
     }
@@ -37,7 +37,7 @@ export class ConeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("circle.radius")
+    @property("circle.radius", { quantity: "length" })
     get radius() {
         return this.getPrivateValue("radius");
     }
@@ -46,7 +46,7 @@ export class ConeNode extends ParameterShapeNode {
     }
 
     @serialize()
-    @property("box.dz")
+    @property("box.dz", { quantity: "length" })
     get dz() {
         return this.getPrivateValue("dz");
     }

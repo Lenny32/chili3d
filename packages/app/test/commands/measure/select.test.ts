@@ -431,7 +431,7 @@ describe("SelectMeasure", () => {
             // The edge mesh is highlighted and the measured length is displayed
             expect(doc.visual.context.displayMesh).toHaveBeenCalledWith([fakeEdge.mesh.edges]);
             expect(htmlText).toHaveBeenCalledTimes(1);
-            expect(htmlText.mock.calls[0][0]).toBe("3.00");
+            expect(htmlText.mock.calls[0][0]).toBe("3.00 mm");
         });
     });
 
@@ -474,7 +474,7 @@ describe("SelectMeasure", () => {
             // The outer-wire mesh is highlighted and the measured area is displayed
             expect(doc.visual.context.displayMesh).toHaveBeenCalledWith([fakeOuterWire.mesh.edges]);
             expect(htmlText).toHaveBeenCalledTimes(1);
-            expect(htmlText.mock.calls[0][0]).toBe("4.00");
+            expect(htmlText.mock.calls[0][0]).toBe("4.00 mm²");
         });
     });
 
@@ -510,7 +510,7 @@ describe("SelectMeasure", () => {
             // The solid edge mesh is highlighted and the measured volume is displayed
             expect(doc.visual.context.displayMesh).toHaveBeenCalledWith([fakeSolid.mesh.edges]);
             expect(htmlText).toHaveBeenCalledTimes(1);
-            expect(htmlText.mock.calls[0][0]).toBe("8.00");
+            expect(htmlText.mock.calls[0][0]).toBe("8.00 mm³");
         });
     });
 });

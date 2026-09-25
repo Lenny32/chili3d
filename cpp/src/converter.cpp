@@ -9,8 +9,10 @@
 #include <BRepMesh_IncrementalMesh.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
+#include <DESTEP_Parameters.hxx>
 #include <IGESCAFControl_Reader.hxx>
 #include <IGESControl_Writer.hxx>
+#include <Interface_Static.hxx>
 #include <Quantity_Color.hxx>
 #include <STEPCAFControl_Reader.hxx>
 #include <STEPControl_Writer.hxx>
@@ -22,6 +24,7 @@
 #include <TDocStd_Document.hxx>
 #include <TopoDS_Iterator.hxx>
 #include <TopoDS_Shape.hxx>
+#include <UnitsMethods_LengthUnit.hxx>
 #include <XCAFDoc_ColorTool.hxx>
 #include <XCAFDoc_DocumentTool.hxx>
 #include <XCAFDoc_ShapeTool.hxx>
@@ -386,23 +389,51 @@ public:
         return parseNodeFromDocument(document);
     }
 
-    static std::string convertToStep(const ShapeArray& input)
+    // Shapes are modelled in millimetres (OCCT's default session unit). The writers convert
+    // coordinates from that unit into `unit` ("mm", "cm", "m" or "in") and record it in the
+    // file, so an importer reading the declared unit gets the same physical size.
+    static UnitsMethods_LengthUnit stepLengthUnit(const std::string& unit)
+    {
+        if (unit == "cm")
+            return UnitsMethods_LengthUnit_Centimeter;
+        if (unit == "m")
+            return UnitsMethods_LengthUnit_Meter;
+        if (unit == "in")
+            return UnitsMethods_LengthUnit_Inch;
+        return UnitsMethods_LengthUnit_Millimeter;
+    }
+
+    static const char* igesUnitName(const std::string& unit)
+    {
+        if (unit == "cm")
+            return "CM";
+        if (unit == "m")
+            return "M";
+        if (unit == "in")
+            return "IN";
+        return "MM";
+    }
+
+    static std::string convertToStep(const ShapeArray& input, const std::string& unit)
     {
         auto shapes = vecFromJSArray<TopoDS_Shape>(input);
         std::ostringstream oss;
         STEPControl_Writer stepWriter;
+        DESTEP_Parameters parameters;
+        parameters.InitFromStatic();
+        parameters.WriteUnit = stepLengthUnit(unit);
         for (const auto& shape : shapes) {
-            stepWriter.Transfer(shape, STEPControl_AsIs);
+            stepWriter.Transfer(shape, STEPControl_AsIs, parameters);
         }
         stepWriter.WriteStream(oss);
         return oss.str();
     }
 
-    static std::string convertToIges(const ShapeArray& input)
+    static std::string convertToIges(const ShapeArray& input, const std::string& unit)
     {
         auto shapes = vecFromJSArray<TopoDS_Shape>(input);
         std::ostringstream oss;
-        IGESControl_Writer igesWriter;
+        IGESControl_Writer igesWriter(igesUnitName(unit), Interface_Static::IVal("write.iges.brep.mode"));
         for (const auto& shape : shapes) {
             igesWriter.AddShape(shape);
         }

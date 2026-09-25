@@ -3,6 +3,7 @@
 
 import {
     type AsyncController,
+    documentLengthUnit,
     type I18nKeys,
     type IDocument,
     type IEventHandler,
@@ -15,6 +16,7 @@ import {
     Plane,
     Precision,
     PubSub,
+    parseLength,
     Result,
     type ShapeMeshData,
     ShapeTypes,
@@ -523,9 +525,11 @@ export class ExtrudeDragHandler implements IEventHandler {
         if (!["#", "-", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(event.key)) return;
 
         PubSub.default.pub("showInput", event.key, (text: string) => {
-            if (Number.isNaN(Number(text))) return Result.err("error.input.invalidNumber" as I18nKeys);
+            // Typed in the project unit (or with an explicit one, `1in`); the drag works in mm.
+            const parsed = parseLength(text, documentLengthUnit(this.document));
+            if (!parsed.isOk) return Result.err("error.input.invalidNumber" as I18nKeys);
 
-            const value = Number(text);
+            const value = parsed.value;
             this.state.dist = this.state.dist < -Precision.Float ? -value : value;
             this.data.onDist?.(this.state.dist);
             this.commitView = view;

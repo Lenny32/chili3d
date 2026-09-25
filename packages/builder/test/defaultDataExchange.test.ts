@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type CadExportOptions,
     EditableShapeNode,
     type IDocument,
     type IMeshExporter,
@@ -11,6 +12,7 @@ import {
     PubSub,
     Result,
     type VisualNode,
+    XYZ,
 } from "@chili3d/core";
 import { createMockDocument, MockShape, TestNode } from "@chili3d/core/test-utils";
 import { rs } from "@rstest/core";
@@ -297,8 +299,14 @@ describe("DefaultDataExchange", () => {
                     (_shapes: IShape[], _options?: { binary: boolean }) =>
                         Result.ok(new Uint8Array([1, 2, 3])) as Result<BlobPart>,
                 ),
-                convertToSTEP: rs.fn((..._shapes: IShape[]) => Result.ok("step-data") as Result<BlobPart>),
-                convertToIGES: rs.fn((..._shapes: IShape[]) => Result.ok("iges-data") as Result<BlobPart>),
+                convertToSTEP: rs.fn(
+                    (_shapes: IShape[], _options?: CadExportOptions) =>
+                        Result.ok("step-data") as Result<BlobPart>,
+                ),
+                convertToIGES: rs.fn(
+                    (_shapes: IShape[], _options?: CadExportOptions) =>
+                        Result.ok("iges-data") as Result<BlobPart>,
+                ),
                 convertToBrep: rs.fn((_shape: IShape) => Result.ok("brep-data") as Result<BlobPart>),
             };
             rs.stubGlobal("shapeConverter", converter);
@@ -318,7 +326,7 @@ describe("DefaultDataExchange", () => {
 
             expect(result).toEqual(["ply-data"]);
             expect(exportToPly).toHaveBeenCalledTimes(1);
-            expect(exportToPly).toHaveBeenCalledWith([node], true);
+            expect(exportToPly).toHaveBeenCalledWith([node], true, { scale: 1 });
             expect(exportToObj).not.toHaveBeenCalled();
         });
 
@@ -330,7 +338,7 @@ describe("DefaultDataExchange", () => {
 
             expect(result).toEqual(["ply-data"]);
             expect(exportToPly).toHaveBeenCalledTimes(1);
-            expect(exportToPly).toHaveBeenCalledWith([node], false);
+            expect(exportToPly).toHaveBeenCalledWith([node], false, { scale: 1 });
             expect(exportToObj).not.toHaveBeenCalled();
         });
 
@@ -342,7 +350,7 @@ describe("DefaultDataExchange", () => {
 
             expect(result).toEqual(["obj-data"]);
             expect(exportToObj).toHaveBeenCalledTimes(1);
-            expect(exportToObj).toHaveBeenCalledWith([node]);
+            expect(exportToObj).toHaveBeenCalledWith([node], { scale: 1 });
             expect(exportToPly).not.toHaveBeenCalled();
         });
 
@@ -385,8 +393,62 @@ describe("DefaultDataExchange", () => {
             expect(result).toEqual([data]);
             expect(transformedMul).toHaveBeenCalledTimes(1);
             expect(converter[method]).toHaveBeenCalledTimes(1);
-            expect(converter[method]).toHaveBeenCalledWith(transformed);
+            expect(converter[method]).toHaveBeenCalledWith([transformed], { lengthUnit: "mm" });
             expect(converter.convertToSTL).not.toHaveBeenCalled();
+        });
+
+        test("should scale an STL export in cm by 0.1 and keep the physical size", async () => {
+            const converter = stubShapeConverter();
+            const doc = createMockDocument();
+            const { node, transformed } = createShapeNode(doc, "stl-cm");
+            const scaled = new MockShape({ id: "stl-cm-scaled" });
+            const scale = rs.fn((_matrix: Matrix4) => scaled);
+            transformed.transformedMul = scale;
+
+            await exchange.export(".stl", [node], { lengthUnit: "cm" });
+
+            expect(scale).toHaveBeenCalledTimes(1);
+            // A 10 mm edge comes out as 1: the file's numbers are centimetres.
+            expect(scale.mock.calls[0][0].ofPoint(new XYZ({ x: 10, y: 0, z: 0 })).x).toBeCloseTo(1, 12);
+            expect(converter.convertToSTL).toHaveBeenCalledWith([scaled], { binary: false });
+        });
+
+        test("should hand STEP its unit instead of scaling the geometry", async () => {
+            const converter = stubShapeConverter();
+            const doc = createMockDocument();
+            const { node, transformed } = createShapeNode(doc, "step-in");
+            const scale = rs.fn((_matrix: Matrix4) => new MockShape());
+            transformed.transformedMul = scale;
+
+            await exchange.export(".step", [node], { lengthUnit: "in" });
+
+            expect(scale).not.toHaveBeenCalled();
+            expect(converter.convertToSTEP).toHaveBeenCalledWith([transformed], { lengthUnit: "in" });
+        });
+
+        test("should scale mesh formats through the mesh exporter", async () => {
+            const { doc, exportToPly } = createDocWithMeshExporter();
+            const node = new EditableShapeNode({
+                document: doc,
+                name: "ply",
+                shape: Result.ok(new MockShape()),
+            });
+
+            await exchange.export(".ply", [node], { lengthUnit: "m" });
+
+            expect(exportToPly).toHaveBeenCalledWith([node], true, { scale: 0.001 });
+        });
+
+        test.each([
+            [".step", "embedded"],
+            [".iges", "embedded"],
+            [".stl", "none"],
+            [".stl binary", "none"],
+            [".brep", "none"],
+            [".obj", "none"],
+            [".ply", "none"],
+        ] as const)("should report %s unit handling as %s", (type, kind) => {
+            expect(exchange.exportUnitHandling(type).kind).toBe(kind);
         });
 
         test("should route .brep through shapeFactory.combine then convertToBrep and dispose the compound", async () => {
@@ -450,7 +512,7 @@ describe("DefaultDataExchange", () => {
 
             expect(result).toEqual(["step-data"]);
             expect(converter.convertToSTEP).toHaveBeenCalledTimes(1);
-            expect(converter.convertToSTEP).toHaveBeenCalledWith(transformed);
+            expect(converter.convertToSTEP).toHaveBeenCalledWith([transformed], { lengthUnit: "mm" });
             expect(pubSpy).not.toHaveBeenCalledWith("showToast", "error.export.noNodeCanBeExported");
         });
     });

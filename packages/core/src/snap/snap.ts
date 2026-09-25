@@ -1,6 +1,7 @@
 // Part of the Chili3d Project, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
+import type { ConstructionRef } from "../construction/types";
 import type { IDocument } from "../document";
 import { I18nKeys } from "../i18n";
 import type { Plane, XYZ } from "../math";
@@ -53,6 +54,8 @@ export interface SnapResult {
     shapes: VisualShapeData[];
     nodes?: VisualNode[];
     plane?: Plane;
+    /** Associative construction point, retained by consumers instead of only its coordinates. */
+    constructionRef?: ConstructionRef;
 }
 
 export interface MouseAndDetected {

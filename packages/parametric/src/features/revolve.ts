@@ -10,6 +10,7 @@ import {
     Line,
     type Matrix4,
     Result,
+    resolveConstructionRef,
     resolveUnitSpec,
     ShapeNode,
     ShapeTypes,
@@ -40,10 +41,13 @@ const revolveHandler: FeatureHandler<RevolveFeatureData> = {
     display: "command.feature.revolve",
     icon: "icon-revolve",
 
-    nodeIds: (feature) =>
-        feature.axisSource === undefined || feature.axisSource.nodeId === feature.sketchId
-            ? [feature.sketchId]
-            : [feature.sketchId, feature.axisSource.nodeId],
+    nodeIds: (feature) => {
+        const ids = [feature.sketchId];
+        if (feature.axisSource && feature.axisSource.nodeId !== feature.sketchId)
+            ids.push(feature.axisSource.nodeId);
+        if (feature.constructionAxisRef?.kind === "datum") ids.push(feature.constructionAxisRef.nodeId);
+        return ids;
+    },
 
     // The axis source stays out of the row: it is a host body the tree already
     // shows, and the revolve's own door is the section sketch.
@@ -71,7 +75,16 @@ const revolveHandler: FeatureHandler<RevolveFeatureData> = {
 
         const angle = resolveUnitSpec(feature.angle, context.scope, ANGLE_UNITS);
         if (!angle.isOk) return Result.err(angle.error);
-        const { axis, anchor } = resolveAxis(feature, context);
+        let axis: Line;
+        let anchor: EdgeRef | undefined;
+        if (feature.constructionAxisRef) {
+            const resolved = resolveConstructionRef(context.document, feature.constructionAxisRef);
+            if (!resolved.isOk) return Result.err(resolved.error);
+            if (resolved.value.kind !== "axis") return Result.err("Construction reference is not an axis");
+            axis = new Line({ point: resolved.value.origin, direction: resolved.value.direction });
+        } else {
+            ({ axis, anchor } = resolveAxis(feature, context));
+        }
         const profiles = resolveProfiles(sketch, feature.profiles);
         if (!profiles.isOk) return Result.err(profiles.error);
         const tracking = context.tracking;

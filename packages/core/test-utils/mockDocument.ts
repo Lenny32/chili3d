@@ -120,6 +120,8 @@ export function createMockDocument(overrides: MockDocumentOverrides = {}): IDocu
         findNodes: () => [],
         getChildren: () => [],
         notifyNodeChanged: () => {},
+        addNodeObserver: () => {},
+        removeNodeObserver: () => {},
         dispose: () => {},
         ...overrides.modelManager,
     } as unknown as ModelManager;

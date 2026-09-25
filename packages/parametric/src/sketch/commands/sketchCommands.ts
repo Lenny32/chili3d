@@ -4,7 +4,10 @@
 import {
     AsyncController,
     CancelableCommand,
+    ConstructionNode,
+    type ConstructionRef,
     command,
+    getActiveConstructionPlane,
     type IApplication,
     type ICommand,
     type IDocument,
@@ -13,6 +16,7 @@ import {
     type INode,
     type Plane,
     PubSub,
+    resolveConstructionRef,
     ShapeTypes,
     Transaction,
 } from "@chili3d/core";
@@ -32,6 +36,7 @@ import { PlanePickHandler, type PlanePickResult } from "./planePickHandler";
 
 interface PickedPlane {
     plane: Plane;
+    constructionRef?: ConstructionRef;
     /** Set when the plane comes from a solid's face, so the sketch follows that face. */
     planeRef?: PlaneFaceRef;
     /** Boundary edges of the picked face, captured as reference-role external refs. */
@@ -104,6 +109,7 @@ export function captureBoundaryExternalRefs(
 function resolvePlane(document: IDocument, result: PlanePickResult | undefined): PickedPlane | undefined {
     if (result === undefined) return undefined;
     if (result.kind === "datum") return { plane: result.plane };
+    if (result.kind === "construction") return { plane: result.plane, constructionRef: result.ref };
 
     const face = result.data.shape.transformedMul(result.data.transform) as IFace;
     const plane = sketchPlaneOfFace(face);
@@ -146,7 +152,44 @@ function capturePlaneOwner(
     };
 }
 
-async function pickPlane(document: IDocument, controller: AsyncController): Promise<PickedPlane | undefined> {
+async function pickPlane(
+    document: IDocument,
+    controller: AsyncController,
+    ucsMember?: "XY" | "YZ" | "ZX",
+): Promise<PickedPlane | undefined> {
+    const selectedDatum = document.selection
+        .getSelectedNodes()
+        .find((node) => node instanceof ConstructionNode);
+    if (selectedDatum instanceof ConstructionNode) {
+        const active = getActiveConstructionPlane(document.application.activeView!);
+        const activeMember =
+            active?.kind === "datum" && active.nodeId === selectedDatum.id ? active.member : undefined;
+        const member = ucsMember ?? (activeMember === "YZ" || activeMember === "ZX" ? activeMember : "XY");
+        const constructionRef: ConstructionRef = {
+            kind: "datum",
+            nodeId: selectedDatum.id,
+            ...(selectedDatum.definition.kind === "ucs" ? { member } : {}),
+        };
+        const resolved = resolveConstructionRef(document, constructionRef);
+        if (resolved.isOk && resolved.value.kind === "plane") {
+            return { plane: resolved.value.plane, constructionRef };
+        }
+        PubSub.default.pub("displayError", resolved.isOk ? "Select a plane or UCS" : resolved.error);
+        return undefined;
+    }
+    const selectedFace = document.selection
+        .getSelectedShapes()
+        .find((shape) => shape.shape.shapeType === ShapeTypes.face);
+    if (selectedFace) {
+        return resolvePlane(document, { kind: "face", data: selectedFace });
+    }
+    const activeReference = getActiveConstructionPlane(document.application.activeView!);
+    if (activeReference) {
+        const resolved = resolveConstructionRef(document, activeReference);
+        if (resolved.isOk && resolved.value.kind === "plane") {
+            return { plane: resolved.value.plane, constructionRef: activeReference };
+        }
+    }
     document.selection.clearSelection();
     const handler = new PlanePickHandler(document, controller);
     await document.picker.pickAsync(handler, "prompt.select.plane", controller, false, "select.default");
@@ -179,6 +222,7 @@ function sketchDataFromPick(picked: PickedPlane): SketchData | undefined {
 
 @command({ key: "sketch.create", icon: "icon-sketchNew" })
 export class CreateSketch extends CancelableCommand {
+    protected readonly ucsMember?: "XY" | "YZ" | "ZX";
     async executeAsync(): Promise<void> {
         SketchEditor.exit();
 
@@ -188,12 +232,13 @@ export class CreateSketch extends CancelableCommand {
             return;
         }
         this.controller = new AsyncController();
-        const picked = await pickPlane(document, this.controller);
+        const picked = await pickPlane(document, this.controller, this.ucsMember);
         if (picked === undefined) return;
         const node = new SketchNode({
             document,
             plane: picked.plane,
             planeRef: picked.planeRef,
+            constructionPlaneRef: picked.constructionRef,
             data: sketchDataFromPick(picked),
         });
         Transaction.execute(document, "create sketch", () => {
@@ -201,6 +246,19 @@ export class CreateSketch extends CancelableCommand {
         });
         SketchEditor.enter(node);
     }
+}
+
+@command({ key: "sketch.createUcsXY", icon: "icon-sketchNew" })
+export class CreateSketchOnUcsXY extends CreateSketch {
+    protected override readonly ucsMember = "XY";
+}
+@command({ key: "sketch.createUcsYZ", icon: "icon-sketchNew" })
+export class CreateSketchOnUcsYZ extends CreateSketch {
+    protected override readonly ucsMember = "YZ";
+}
+@command({ key: "sketch.createUcsZX", icon: "icon-sketchNew" })
+export class CreateSketchOnUcsZX extends CreateSketch {
+    protected override readonly ucsMember = "ZX";
 }
 
 @command({ key: "sketch.enter", icon: "icon-sketchEdit" })

@@ -2,6 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import {
+    type ConstructionRef,
     type I18nKeys,
     type IDocument,
     type IEdge,
@@ -16,6 +17,7 @@ import {
     Precision,
     PubSub,
     Result,
+    resolveConstructionRef,
     serializable,
     serialize,
 } from "@chili3d/core";
@@ -48,6 +50,8 @@ export interface SketchNodeOptions {
     planeRef?: PlaneFaceRef;
     /** Serialized form produced by the Serializer; takes precedence over `planeRef`. */
     planeRefJson?: string;
+    constructionPlaneRef?: ConstructionRef;
+    constructionPlaneRefJson?: string;
     data?: SketchData;
     /** Serialized form produced by the Serializer; takes precedence over `data`. */
     dataJson?: string;
@@ -88,6 +92,33 @@ export class SketchNode extends ParameterShapeNode {
         return json === undefined ? undefined : (JSON.parse(json) as PlaneFaceRef);
     }
 
+    @serialize()
+    get constructionPlaneRefJson(): string | undefined {
+        return this.getPrivateValue("constructionPlaneRefJson");
+    }
+    set constructionPlaneRefJson(value: string | undefined) {
+        this.setProperty("constructionPlaneRefJson", value, () => this.followExternalRefs());
+    }
+
+    get constructionPlaneRef(): ConstructionRef | undefined {
+        return this.constructionPlaneRefJson === undefined
+            ? undefined
+            : (JSON.parse(this.constructionPlaneRefJson) as ConstructionRef);
+    }
+
+    override get shape(): Result<IShape> {
+        const ref = this.constructionPlaneRef;
+        if (ref !== undefined) {
+            const resolved = resolveConstructionRef(this.document, ref);
+            if (!resolved.isOk) return Result.err(resolved.error);
+            if (resolved.value.kind !== "plane") return Result.err("Construction source is not a plane");
+        }
+        return super.shape;
+    }
+    override set shape(value: Result<IShape>) {
+        super.shape = value;
+    }
+
     /**
      * SketchData is a plain JSON object graph; the Serializer only round-trips
      * @serializable classes, so it is stored as a JSON string.
@@ -112,6 +143,7 @@ export class SketchNode extends ParameterShapeNode {
     }
 
     private _planeRefNode: INode | undefined;
+    private _constructionPlaneError?: string;
 
     /**
      * Derived, runtime-only warning state behind `INodeWarning` (the model-tree
@@ -143,6 +175,13 @@ export class SketchNode extends ParameterShapeNode {
                 (options.planeRef === undefined ? undefined : JSON.stringify(options.planeRef)),
         );
         this.setPrivateValue(
+            "constructionPlaneRefJson",
+            options.constructionPlaneRefJson ??
+                (options.constructionPlaneRef === undefined
+                    ? undefined
+                    : JSON.stringify(options.constructionPlaneRef)),
+        );
+        this.setPrivateValue(
             "dataJson",
             options.dataJson ?? JSON.stringify(options.data ?? { entities: [], constraints: [] }),
         );
@@ -150,6 +189,7 @@ export class SketchNode extends ParameterShapeNode {
         this._danglingProfileCount = danglingIds.length;
         this._danglingSignature = danglingIds.join(",");
         ensureVariableSync(options.document);
+        options.document.modelManager.addNodeObserver(this.handleConstructionTreeChanged);
     }
 
     setDataEmitShapeChanged(data: SketchData): void {
@@ -205,6 +245,14 @@ export class SketchNode extends ParameterShapeNode {
         const refsFresh = this._externalRefsFresh;
         this._externalRefsFresh = false;
         this.syncPlaneRefWatch();
+        const constructionRef = this.constructionPlaneRef;
+        if (constructionRef !== undefined) {
+            const resolved = resolveConstructionRef(this.document, constructionRef);
+            if (!resolved.isOk) return Result.err(resolved.error);
+            if (resolved.value.kind !== "plane") return Result.err("Construction source is not a plane");
+            const constructionPlane = resolved.value.plane;
+            this.withoutHistory(() => this.setProperty("plane", constructionPlane));
+        }
         if (!refsFresh) {
             this.refreshExternalRefs();
         }
@@ -318,8 +366,13 @@ export class SketchNode extends ParameterShapeNode {
     /** Watches the node the plane reference points at; unresolved ids are retried next evaluation. */
     private syncPlaneRefWatch(): void {
         const ref = this.planeRef;
+        const constructionRef = this.constructionPlaneRef;
         const node =
-            ref === undefined ? undefined : this.document.modelManager.findNode((n) => n.id === ref.nodeId);
+            constructionRef?.kind === "datum"
+                ? this.document.modelManager.findNode((n) => n.id === constructionRef.nodeId)
+                : ref === undefined
+                  ? undefined
+                  : this.document.modelManager.findNode((n) => n.id === ref.nodeId);
         if (node === this._planeRefNode) return;
         if (this._planeRefNode !== undefined && isPropertyChanged(this._planeRefNode)) {
             this._planeRefNode.removePropertyChanged(this.handlePlaneRefNodeChanged);
@@ -352,12 +405,23 @@ export class SketchNode extends ParameterShapeNode {
 
     /** Follows the referenced face: a source rebuild or a move carries the sketch plane with it. */
     private readonly handlePlaneRefNodeChanged = (property: string) => {
-        if (property !== "shape" && property !== "transform") return;
+        if (property !== "shape" && property !== "transform" && property !== "geometry") return;
         this.withoutHistory(() => {
             if (this.followPlaneRef()) {
                 this.setShape(this.generateShape());
             }
+            if (this.constructionPlaneRef !== undefined) {
+                // The source can become invalid without moving. Notify body consumers so
+                // their cached feature result is re-evaluated and reports the lost ref.
+                this.emitPropertyChanged("shape", this._shape);
+            }
         });
+    };
+
+    private readonly handleConstructionTreeChanged = () => {
+        if (this.constructionPlaneRef === undefined) return;
+        this.syncPlaneRefWatch();
+        this.handlePlaneRefNodeChanged("geometry");
     };
 
     /**
@@ -377,6 +441,22 @@ export class SketchNode extends ParameterShapeNode {
      *   the plane stays wedged at the old spot for good.
      */
     private followPlaneRef(): boolean {
+        const constructionRef = this.constructionPlaneRef;
+        if (constructionRef !== undefined) {
+            const resolved = resolveConstructionRef(this.document, constructionRef);
+            const error = !resolved.isOk
+                ? resolved.error
+                : resolved.value.kind !== "plane"
+                  ? "Construction source is not a plane"
+                  : undefined;
+            this._constructionPlaneError = error;
+            if (error !== undefined) return false;
+            if (resolved.value.kind !== "plane") return false;
+            const constructionPlane = resolved.value.plane;
+            if (this.isSamePlane(constructionPlane)) return false;
+            this.withoutHistory(() => this.setProperty("plane", constructionPlane));
+            return true;
+        }
         const ref = this.planeRef;
         if (ref === undefined) return false;
         // A frozen source (a transient rollback preview, see `isFrozenSource`) yields no
@@ -612,6 +692,7 @@ export class SketchNode extends ParameterShapeNode {
     };
 
     override disposeInternal(): void {
+        this.document.modelManager.removeNodeObserver(this.handleConstructionTreeChanged);
         if (this._planeRefNode !== undefined && isPropertyChanged(this._planeRefNode)) {
             this._planeRefNode.removePropertyChanged(this.handlePlaneRefNodeChanged);
         }

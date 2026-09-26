@@ -1,4 +1,4 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
 export const I18N_KEYS = [
@@ -524,6 +524,9 @@ export const I18N_KEYS = [
     "entity.editable",
     "entity.parameter",
     "error.default:{0}",
+    "error.document.migrationFailed:{0}",
+    "error.document.newerFormat",
+    "error.document.notSpicy3D",
     "error.export.noNodeCanBeExported",
     "error.import.unsupportedFileType:{0}",
     "error.input.cannotInputANumber",
@@ -538,6 +541,7 @@ export const I18N_KEYS = [
     "file.unitInfo.none{0}{1}",
     "file.unitInfo.fixed{0}{1}",
     "helix.pitch",
+    "home.basedOn",
     "home.recent",
     "home.recent.empty",
     "home.welcome",
@@ -606,6 +610,7 @@ export const I18N_KEYS = [
     "mcp.title",
     "mcp.tokenHint",
     "model.visible",
+    "node.unknown.warning",
     "option.command.circularPattern",
     "option.command.continuity",
     "option.command.deleteObjects",

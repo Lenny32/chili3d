@@ -1,10 +1,10 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { ICommand, IDocument, IView, IVisualFactory, Serialized } from "@chili3d/core";
-import { Logger, ObservableCollection, PubSub } from "@chili3d/core";
-import { createMockView, createMockVisualWithDocument } from "@chili3d/core/test-utils";
 import { afterEach, beforeEach, describe, expect, rs, test } from "@rstest/core";
+import type { ICommand, IDocument, IView, IVisualFactory, Serialized } from "@spicy3d/core";
+import { DOCUMENT_FORMAT_VERSION, Logger, ObservableCollection, PubSub } from "@spicy3d/core";
+import { createMockView, createMockVisualWithDocument } from "@spicy3d/core/test-utils";
 import { Application } from "../src/application";
 
 // IMPORTANT: Application constructor calls setCurrentApplication(this), which
@@ -33,7 +33,7 @@ function makeVisualFactory(): IVisualFactory {
 
 function makeSerializedDocData(name: string, id: string): Serialized {
     return {
-        version: "0.7.1",
+        formatVersion: DOCUMENT_FORMAT_VERSION,
         name,
         id,
         models: {
@@ -321,20 +321,22 @@ describe("Application", () => {
             expect(sharedApp.activeView).not.toBeNull();
         });
 
-        test("should return undefined when version mismatches", async () => {
-            const originalAlert = globalThis.alert;
-            globalThis.alert = (() => {}) as any;
+        test("should return undefined and open no view for a newer document format", async () => {
+            const pub = rs.spyOn(PubSub.default, "pub").mockImplementation(() => {});
 
             try {
-                const badVersionData = {
+                const newerData = {
                     ...validSerializedData,
-                    version: "0.0.1",
+                    formatVersion: DOCUMENT_FORMAT_VERSION + 1,
                 } as unknown as Serialized;
 
-                const doc = await sharedApp.loadDocument(badVersionData);
+                const doc = await sharedApp.loadDocument(newerData);
+
                 expect(doc).toBeUndefined();
+                expect(sharedApp.activeView).toBeUndefined();
+                expect(pub).toHaveBeenCalledWith("showToast", "error.document.newerFormat");
             } finally {
-                globalThis.alert = originalAlert;
+                pub.mockRestore();
             }
         });
     });
@@ -436,8 +438,8 @@ describe("Application", () => {
             expect(result.opens).toHaveLength(1);
         });
 
-        test("should group .chiliplugin files as plugins", () => {
-            const pluginFile = new File([""], "my.plugin.chiliplugin");
+        test("should group .spicyplugin files as plugins", () => {
+            const pluginFile = new File([""], "my.plugin.spicyplugin");
             const result = callGroupFiles([pluginFile]);
             expect(result.plugins).toHaveLength(1);
             expect(result.plugins[0]).toBe(pluginFile);
@@ -445,8 +447,8 @@ describe("Application", () => {
             expect(result.imports).toHaveLength(0);
         });
 
-        test("should be case-insensitive for .chiliplugin extension", () => {
-            const result = callGroupFiles([new File([""], "my.CHILIPLUGIN")]);
+        test("should be case-insensitive for .spicyplugin extension", () => {
+            const result = callGroupFiles([new File([""], "my.SPICYPLUGIN")]);
             expect(result.plugins).toHaveLength(1);
         });
 
@@ -462,7 +464,7 @@ describe("Application", () => {
         test("should handle mixed file types", () => {
             const files = [
                 new File([""], "a.cd"),
-                new File([""], "b.chiliplugin"),
+                new File([""], "b.spicyplugin"),
                 new File([""], "c.step"),
                 new File([""], "d.iges"),
                 new File([""], "e.CD"),

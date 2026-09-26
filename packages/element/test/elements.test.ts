@@ -1,4 +1,4 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
 import {
@@ -185,7 +185,7 @@ describe("createIcon", () => {
         const el = createIcon({ type: "unknown", value: "data" } as any);
         expect(el.tagName).toBe("svg");
         const useEl = el.children[0] as SVGUseElement;
-        expect(useEl.getAttributeNS("http://www.w3.org/1999/xlink", "href")).toBe("#icon-chili");
+        expect(useEl.getAttributeNS("http://www.w3.org/1999/xlink", "href")).toBe("#icon-spicy");
     });
 });
 

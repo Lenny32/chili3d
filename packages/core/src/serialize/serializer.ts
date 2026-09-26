@@ -1,4 +1,4 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
 import type { IDocument } from "../document";
@@ -13,6 +13,13 @@ export type PropertyInfo = {
 };
 
 export const InternalClassName = "__cla$$__";
+
+/**
+ * An object that stands in for data whose class this build does not know (e.g. a node from a
+ * plugin that is not loaded) returns its serialized form under this key, verbatim — class name
+ * included — so saving writes it back unchanged.
+ */
+export const RawSerialized = Symbol("RawSerialized");
 
 export type SerializedData = { [x: string]: any };
 
@@ -181,7 +188,14 @@ export class Serializer {
         return false;
     }
 
+    static isRegistered(className: string): boolean {
+        return reflectMap.has(className);
+    }
+
     static serializeObject(target: object): Serialized {
+        const raw = (target as { [RawSerialized]?: Serialized })[RawSerialized];
+        if (raw !== undefined) return raw;
+
         const className = target.constructor.name;
         if (!reflectMap.has(className)) {
             console.log(target);

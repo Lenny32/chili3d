@@ -1,7 +1,7 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import type { Locale } from "@chili3d/core";
+import type { Locale } from "@spicy3d/core";
 
 export default {
     display: "English",
@@ -15,7 +15,7 @@ export default {
         "ai.baseURL": "Base URL",
         "ai.cancel": "Cancel",
         "ai.copy": "Copy",
-        "ai.emptyAsk": "Or ask how to use Chili3D — e.g. “how do I chamfer an edge?”",
+        "ai.emptyAsk": "Or ask how to use Spicy3D — e.g. “how do I chamfer an edge?”",
         "ai.emptyExample": "e.g. create a 10×20×5 box, then fillet 2mm",
         "ai.emptyHint": "Create and edit 3D models with natural language",
         "ai.emptyTitle": "AI Modeling Assistant",
@@ -532,6 +532,11 @@ export default {
         "entity.editable": "Editable Entity",
         "entity.parameter": "Parameter Entity",
         "error.default:{0}": "error: {0}",
+        "error.document.migrationFailed:{0}":
+            "This document could not be upgraded to the current format: {0}",
+        "error.document.newerFormat":
+            "This document was saved with a newer Spicy3D — please reload the page to update",
+        "error.document.notSpicy3D": "This file is not a Spicy3D document",
         "error.export.noNodeCanBeExported": "No node can be exported",
         "error.import.unsupportedFileType:{0}": "Unsupported file type: {0}",
         "error.input.cannotInputANumber": "Overlap with reference point, 1 number cannot be entered",
@@ -548,9 +553,10 @@ export default {
             "{0} files carry no unit. Coordinates are written in {1}: the importing application must read the file as {1}.",
         "file.unitInfo.fixed{0}{1}": "{0} always uses {1}: coordinates are converted to {1}.",
         "helix.pitch": "Pitch",
+        "home.basedOn": "Based on Chili3D",
         "home.recent": "Recent Projects",
         "home.recent.empty": "No recent documents yet. Create or open a document to get started.",
-        "home.welcome": "Welcome to chili3d",
+        "home.welcome": "Welcome to Spicy3D",
         "home.welcome.subtitle": "Design and model in 3D, right in your browser.",
         "items.header": "Items",
         "items.tool.delete": "Delete",
@@ -580,7 +586,7 @@ export default {
         "material.texture.wrapS": "Wrap S",
         "material.texture.wrapT": "Wrap T",
         "mcp.appUrl": "This page's address (the bridge only accepts pages from it)",
-        "mcp.autoConnect": "Connect automatically when Chili3D opens",
+        "mcp.autoConnect": "Connect automatically when Spicy3D opens",
         "mcp.bridgeAt": "Bridge: {0}",
         "mcp.bridgeCommand": "Command (change it only for a fork or a local build)",
         "mcp.bridgeHint":
@@ -588,7 +594,7 @@ export default {
         "mcp.claudeCode": "Claude Code: run in a terminal",
         "mcp.connect": "Connect",
         "mcp.connectHint":
-            "Restart your agent (or reload its MCP servers), then press Connect above. The agent sees the Chili3D tools as soon as this tab is connected. Keep the tab open while it works.",
+            "Restart your agent (or reload its MCP servers), then press Connect above. The agent sees the Spicy3D tools as soon as this tab is connected. Keep the tab open while it works.",
         "mcp.copied": "Copied",
         "mcp.copy": "Copy",
         "mcp.disconnect": "Disconnect",
@@ -626,6 +632,7 @@ export default {
         "mcp.tokenHint":
             "The bridge only accepts this page if it presents the same token. It is generated for you and saved in this browser; if you generate a new one, copy the updated config into your agent again.",
         "model.visible": "Visible",
+        "node.unknown.warning": "Kept unchanged: its plugin is not loaded",
         "option.command.circularPattern": "Circular Pattern",
         "option.command.continuity": "Continuity",
         "option.command.deleteObjects": "Delete Objects",

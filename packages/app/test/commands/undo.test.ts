@@ -2,7 +2,6 @@
 // See LICENSE file in the project root for full license information.
 
 import { describe, expect, test } from "@rstest/core";
-import { PubSub } from "@spicy3d/core";
 import { createMockApplication, createMockDocument } from "@spicy3d/core/test-utils";
 import { Undo } from "../../src/commands/undo";
 

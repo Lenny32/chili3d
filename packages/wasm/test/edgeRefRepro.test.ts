@@ -5,7 +5,7 @@
 // fingerprint from a mesher-range sub-edge (what the picker returns) and re-matches
 // it against a freshly rebuilt prism (what the parametric rebuild does).
 
-import { type IEdge, type IShape, Plane, ShapeTypes, XYZ } from "@spicy3d/core";
+import { type IEdge, type IShape, ShapeTypes, XYZ } from "@spicy3d/core";
 import { matchEdgeIndexes } from "../../parametric/src/features/edgeMatcher";
 import { captureEdgeRef } from "../../parametric/src/features/edgeRef";
 import { createTestFactory, unwrapOk } from "./helpers";

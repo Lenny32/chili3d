@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { describe, expect, test } from "@rstest/core";
-import { type Act, I18n } from "@spicy3d/core";
+import type { Act } from "@spicy3d/core";
 import { createMockApplication } from "@spicy3d/core/test-utils";
 import { ActAlignCameraCommand } from "../../src/commands/createActCommand";
 

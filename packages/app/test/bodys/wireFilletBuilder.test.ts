@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { describe, expect, test } from "@rstest/core";
-import { type IEdge, MathUtils, Precision, ShapeTypes, XYZ } from "@spicy3d/core";
+import { type IEdge, Precision, ShapeTypes, XYZ } from "@spicy3d/core";
 import { WireFilletBuilder } from "../../src/bodys/pipe";
 
 /**

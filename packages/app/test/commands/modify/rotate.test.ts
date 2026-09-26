@@ -2,7 +2,7 @@
 // See LICENSE file in the project root for full license information.
 
 import { afterAll, beforeAll, describe, expect, test } from "@rstest/core";
-import { Config, Dimensions, Matrix4, type Plane, Precision, VisualConfig, XYZ } from "@spicy3d/core";
+import { Config, Dimensions, Matrix4, type Plane, VisualConfig, XYZ } from "@spicy3d/core";
 import { Rotate } from "../../../src/commands/modify/rotate";
 import {
     ensureGlobalStubApp,

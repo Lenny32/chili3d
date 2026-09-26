@@ -11,7 +11,6 @@ import {
     Result,
     type ShapeType,
     ShapeTypes,
-    VisualStates,
     XYZ,
 } from "@spicy3d/core";
 import { createMockApplication, nearestOnSegment, TestDocument } from "@spicy3d/core/test-utils";

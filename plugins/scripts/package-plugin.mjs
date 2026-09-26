@@ -1,4 +1,4 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
 import { readdir, readFile, stat, writeFile } from "node:fs/promises";
@@ -46,7 +46,7 @@ async function addFilesToZip(zip, fileList, basePath) {
 async function main() {
     const args = process.argv.slice(2);
     if (args.length < 2) {
-        console.error("Usage: node package-plugin.mjs <output.chiliplugin> <input1> [input2] ...");
+        console.error("Usage: node package-plugin.mjs <output.spicyplugin> <input1> [input2] ...");
         console.error("    input can be files or directories");
         process.exit(1);
     }

@@ -1,7 +1,7 @@
-// Part of the Chili3d Project, under the AGPL-3.0 License.
+// Part of the Spicy3D Project, derived from Chili3D, under the AGPL-3.0 License.
 // See LICENSE file in the project root for full license information.
 
-import { type CommandIcon, Localize } from "@chili3d/core";
+import { type CommandIcon, Localize } from "@spicy3d/core";
 import { Collection, type CollectionProps } from "./collection";
 import type { HTMLProps } from "./htmlProps";
 import { setProperties } from "./utils";
@@ -24,7 +24,7 @@ export function createIcon(icon: CommandIcon): Element {
         case "path":
             throw new Error("Plugin icon is not supported, please transform it to other icon type");
         default:
-            return svg({ icon: "icon-chili" });
+            return svg({ icon: "icon-spicy" });
     }
 }
 
